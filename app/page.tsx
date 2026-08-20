@@ -1,20 +1,37 @@
-const products = [
-  {
-    id: 1,
-    name: "Pack 500 Reels para Viralizar",
-    description:
-      "500 vídeos prontos para você criar conteúdos para Instagram e TikTok.",
-    price: "R$ 14,90",
-    oldPrice: "R$ 29,90",
-    badge: "MAIS VENDIDO",
-  },
-];
+import { createClient } from "../utils/supabase/server";
 
-export default function Home() {
+type Product = {
+  id: number;
+  name: string;
+  description: string | null;
+  price: number;
+  old_price: number | null;
+  image_url: string | null;
+  purchase_url: string | null;
+  active: boolean;
+};
+
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const supabase = await createClient();
+
+  const { data: products } = await supabase
+    .from("products")
+    .select(
+      "id, name, description, price, old_price, image_url, purchase_url, active"
+    )
+    .eq("active", true)
+    .order("created_at", { ascending: false });
+
+  const activeProducts: Product[] = products || [];
+
   return (
     <main className="min-h-screen bg-[#080808] text-white">
+
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
+
           <div>
             <h1 className="text-xl font-bold">
               AMR<span className="text-orange-500">.</span>STORE
@@ -24,11 +41,13 @@ export default function Home() {
           <span className="text-sm text-gray-400">
             Produtos Digitais
           </span>
+
         </div>
       </header>
 
       <section className="px-5 pb-16 pt-16">
         <div className="mx-auto max-w-4xl text-center">
+
           <span className="inline-block rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-medium text-orange-400">
             CONTEÚDO DIGITAL
           </span>
@@ -44,69 +63,155 @@ export default function Home() {
             Encontre packs de conteúdos digitais prontos para facilitar sua
             criação e ajudar você a manter suas redes sempre movimentadas.
           </p>
+
         </div>
       </section>
 
       <section className="px-5 pb-20">
         <div className="mx-auto max-w-6xl">
+
           <div className="mb-8">
-            <h3 className="text-2xl font-bold">Produtos em destaque</h3>
+            <h3 className="text-2xl font-bold">
+              Produtos em destaque
+            </h3>
+
             <p className="mt-2 text-gray-400">
               Escolha o conteúdo ideal para suas redes.
             </p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {products.map((product) => (
-              <article
-                key={product.id}
-                className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl"
-              >
-                <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
-                  <div className="text-center">
-                    <div className="text-5xl font-black">500</div>
-                    <div className="mt-1 text-sm uppercase tracking-widest text-orange-400">
-                      Reels
+          {activeProducts.length === 0 ? (
+
+            <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center">
+
+              <h4 className="text-xl font-bold">
+                Nenhum produto disponível
+              </h4>
+
+              <p className="mt-2 text-gray-400">
+                Novos produtos estarão disponíveis em breve.
+              </p>
+
+            </div>
+
+          ) : (
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+
+              {activeProducts.map((product) => (
+
+                <article
+                  key={product.id}
+                  className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl"
+                >
+
+                  {product.image_url ? (
+
+                    <div className="h-52 overflow-hidden bg-black">
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="h-full w-full object-cover"
+                      />
                     </div>
-                  </div>
-                </div>
 
-                <div className="p-6">
-                  <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-black">
-                    {product.badge}
-                  </span>
+                  ) : (
 
-                  <h4 className="mt-5 text-xl font-bold">
-                    {product.name}
-                  </h4>
+                    <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
 
-                  <p className="mt-3 text-sm leading-6 text-gray-400">
-                    {product.description}
-                  </p>
+                      <div className="text-center">
 
-                  <div className="mt-6">
-                    <span className="text-sm text-gray-500 line-through">
-                      {product.oldPrice}
-                    </span>
+                        <div className="text-4xl font-black">
+                          AMR
+                        </div>
 
-                    <div className="mt-1 text-3xl font-black">
-                      {product.price}
+                        <div className="mt-1 text-sm uppercase tracking-widest text-orange-400">
+                          Produto Digital
+                        </div>
+
+                      </div>
+
                     </div>
+
+                  )}
+
+                  <div className="p-6">
+
+                    {product.old_price !== null &&
+                      Number(product.old_price) >
+                        Number(product.price) && (
+
+                      <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-black">
+                        OFERTA
+                      </span>
+
+                    )}
+
+                    <h4 className="mt-5 text-xl font-bold">
+                      {product.name}
+                    </h4>
+
+                    {product.description && (
+
+                      <p className="mt-3 text-sm leading-6 text-gray-400">
+                        {product.description}
+                      </p>
+
+                    )}
+
+                    <div className="mt-6">
+
+                      {product.old_price !== null && (
+                        <span className="text-sm text-gray-500 line-through">
+                          R$ {Number(product.old_price).toFixed(2).replace(".", ",")}
+                        </span>
+                      )}
+
+                      <div className="mt-1 text-3xl font-black">
+                        R$ {Number(product.price).toFixed(2).replace(".", ",")}
+                      </div>
+
+                    </div>
+
+                    {product.purchase_url ? (
+
+                      <a
+                        href={product.purchase_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-6 block w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-bold text-black transition hover:bg-orange-400"
+                      >
+                        QUERO MEU PRODUTO
+                      </a>
+
+                    ) : (
+
+                      <button
+                        disabled
+                        className="mt-6 w-full cursor-not-allowed rounded-xl bg-white/10 px-5 py-4 font-bold text-gray-500"
+                      >
+                        COMPRA EM BREVE
+                      </button>
+
+                    )}
+
                   </div>
 
-                  <button className="mt-6 w-full rounded-xl bg-orange-500 px-5 py-4 font-bold text-black transition hover:bg-orange-400">
-                    QUERO MEU PACK
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+                </article>
+
+              ))}
+
+            </div>
+
+          )}
+
         </div>
       </section>
 
       <footer className="border-t border-white/10 px-5 py-8 text-center text-sm text-gray-500">
         © 2026 AMR.STORE — Todos os direitos reservados.
       </footer>
+
     </main>
   );
 }
