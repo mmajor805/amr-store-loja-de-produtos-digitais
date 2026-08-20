@@ -1,7 +1,10 @@
-"use 
+"use client";
+
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../utils/supabase/client";
+
+export const dynamic = "force-dynamic";
 
 type Product = {
   id: number;
@@ -39,12 +42,18 @@ export default function AdminPage() {
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("products")
       .select("*")
       .order("created_at", { ascending: false });
 
-    setProducts(data || []);
+    if (error) {
+      console.error(error);
+      setProducts([]);
+    } else {
+      setProducts(data || []);
+    }
+
     setLoading(false);
   }
 
@@ -59,7 +68,7 @@ export default function AdminPage() {
 
     const { error } = await supabase.from("products").insert({
       name,
-      description,
+      description: description || null,
       price: Number(price),
       old_price: oldPrice ? Number(oldPrice) : null,
       image_url: imageUrl || null,
@@ -88,11 +97,13 @@ export default function AdminPage() {
   async function logout() {
     await supabase.auth.signOut();
     router.replace("/admin/login");
+    router.refresh();
   }
 
   return (
     <main className="min-h-screen bg-[#080808] px-4 py-8 text-white">
       <div className="mx-auto max-w-5xl">
+
         <header className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-black">
@@ -106,7 +117,7 @@ export default function AdminPage() {
 
           <button
             onClick={logout}
-            className="rounded-xl border border-white/10 px-4 py-2 text-sm"
+            className="rounded-xl border border-white/10 px-4 py-2 text-sm transition hover:bg-white/10"
           >
             Sair
           </button>
@@ -117,87 +128,143 @@ export default function AdminPage() {
             Adicionar produto
           </h2>
 
+          <p className="mt-2 text-sm text-gray-400">
+            Cadastre novos produtos sem precisar alterar o código do site.
+          </p>
+
           <form onSubmit={addProduct} className="mt-6 grid gap-4">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nome do produto"
-              required
-              className="rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
-            />
 
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descrição do produto"
-              rows={4}
-              className="rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
-            />
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Nome do produto
+              </label>
 
-            <div className="grid gap-4 sm:grid-cols-2">
               <input
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="Preço atual"
-                type="number"
-                step="0.01"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex.: Pack 500 Reels"
                 required
-                className="rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
-              />
-
-              <input
-                value={oldPrice}
-                onChange={(e) => setOldPrice(e.target.value)}
-                placeholder="Preço antigo"
-                type="number"
-                step="0.01"
-                className="rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
+                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
               />
             </div>
 
-            <input
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="URL da imagem"
-              className="rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
-            />
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Descrição
+              </label>
 
-            <input
-              value={purchaseUrl}
-              onChange={(e) => setPurchaseUrl(e.target.value)}
-              placeholder="Link de compra"
-              className="rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
-            />
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descrição do produto"
+                rows={4}
+                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Preço atual
+                </label>
+
+                <input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="14.90"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Preço antigo
+                </label>
+
+                <input
+                  value={oldPrice}
+                  onChange={(e) => setOldPrice(e.target.value)}
+                  placeholder="29.90"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
+                />
+              </div>
+
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                URL da imagem
+              </label>
+
+              <input
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://..."
+                type="url"
+                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Link de compra
+              </label>
+
+              <input
+                value={purchaseUrl}
+                onChange={(e) => setPurchaseUrl(e.target.value)}
+                placeholder="https://..."
+                type="url"
+                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
+              />
+            </div>
 
             <button
               type="submit"
               disabled={saving}
-              className="rounded-xl bg-orange-500 px-5 py-4 font-bold text-black disabled:opacity-50"
+              className="rounded-xl bg-orange-500 px-5 py-4 font-bold text-black transition hover:bg-orange-400 disabled:opacity-50"
             >
-              {saving ? "Salvando..." : "+ ADICIONAR PRODUTO"}
+              {saving
+                ? "Salvando..."
+                : "+ ADICIONAR PRODUTO"}
             </button>
+
           </form>
         </section>
 
         <section className="mt-8">
+
           <h2 className="mb-4 text-2xl font-bold">
             Produtos cadastrados
           </h2>
 
           {loading ? (
-            <p className="text-gray-400">Carregando...</p>
+            <p className="text-gray-400">
+              Carregando produtos...
+            </p>
           ) : products.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-gray-400">
               Nenhum produto cadastrado ainda.
             </div>
           ) : (
             <div className="grid gap-4">
+
               {products.map((product) => (
                 <div
                   key={product.id}
                   className="rounded-2xl border border-white/10 bg-white/[0.04] p-5"
                 >
+
                   <div className="flex items-center justify-between gap-4">
+
                     <div>
                       <h3 className="font-bold">
                         {product.name}
@@ -211,12 +278,17 @@ export default function AdminPage() {
                     <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-400">
                       Ativo
                     </span>
+
                   </div>
+
                 </div>
               ))}
+
             </div>
           )}
+
         </section>
+
       </div>
     </main>
   );
