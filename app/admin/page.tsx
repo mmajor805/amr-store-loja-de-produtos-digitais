@@ -24,6 +24,7 @@ export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -61,37 +62,123 @@ export default function AdminPage() {
     loadProducts();
   }, []);
 
-  async function addProduct(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    setSaving(true);
-
-    const { error } = await supabase.from("products").insert({
-      name,
-      description: description || null,
-      price: Number(price),
-      old_price: oldPrice ? Number(oldPrice) : null,
-      image_url: imageUrl || null,
-      purchase_url: purchaseUrl || null,
-      active: true,
-    });
-
-    if (error) {
-      alert("Erro ao adicionar produto: " + error.message);
-      setSaving(false);
-      return;
-    }
-
+  function clearForm() {
     setName("");
     setDescription("");
     setPrice("");
     setOldPrice("");
     setImageUrl("");
     setPurchaseUrl("");
+    setEditingId(null);
+  }
 
+  function editProduct(product: Product) {
+    setEditingId(product.id);
+    setName(product.name);
+    setDescription(product.description || "");
+    setPrice(String(product.price));
+    setOldPrice(
+      product.old_price !== null ? String(product.old_price) : ""
+    );
+    setImageUrl(product.image_url || "");
+    setPurchaseUrl(product.purchase_url || "");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  async function saveProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setSaving(true);
+
+    const productData = {
+      name: name.trim(),
+      description: description.trim() || null,
+      price: Number(price),
+      old_price: oldPrice ? Number(oldPrice) : null,
+      image_url: imageUrl.trim() || null,
+      purchase_url: purchaseUrl.trim() || null,
+    };
+
+    if (editingId !== null) {
+      const { error } = await supabase
+        .from("products")
+        .update(productData)
+        .eq("id", editingId);
+
+      if (error) {
+        alert("Erro ao atualizar produto: " + error.message);
+        setSaving(false);
+        return;
+      }
+
+      alert("Produto atualizado com sucesso!");
+    } else {
+      const { error } = await supabase
+        .from("products")
+        .insert({
+          ...productData,
+          active: true,
+        });
+
+      if (error) {
+        alert("Erro ao adicionar produto: " + error.message);
+        setSaving(false);
+        return;
+      }
+
+      alert("Produto adicionado com sucesso!");
+    }
+
+    clearForm();
     await loadProducts();
 
     setSaving(false);
+  }
+
+  async function toggleProduct(product: Product) {
+    const { error } = await supabase
+      .from("products")
+      .update({
+        active: !product.active,
+      })
+      .eq("id", product.id);
+
+    if (error) {
+      alert("Erro ao alterar status: " + error.message);
+      return;
+    }
+
+    await loadProducts();
+  }
+
+  async function deleteProduct(product: Product) {
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir "${product.name}"?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", product.id);
+
+    if (error) {
+      alert("Erro ao excluir produto: " + error.message);
+      return;
+    }
+
+    if (editingId === product.id) {
+      clearForm();
+    }
+
+    await loadProducts();
   }
 
   async function logout() {
@@ -104,7 +191,7 @@ export default function AdminPage() {
     <main className="min-h-screen bg-[#080808] px-4 py-8 text-white">
       <div className="mx-auto max-w-5xl">
 
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-8 flex items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black">
               AMR<span className="text-orange-500">.</span>STORE
@@ -124,15 +211,37 @@ export default function AdminPage() {
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <h2 className="text-2xl font-bold">
-            Adicionar produto
-          </h2>
 
-          <p className="mt-2 text-sm text-gray-400">
-            Cadastre novos produtos sem precisar alterar o código do site.
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold">
+                {editingId !== null
+                  ? "Editar produto"
+                  : "Adicionar produto"}
+              </h2>
 
-          <form onSubmit={addProduct} className="mt-6 grid gap-4">
+              <p className="mt-2 text-sm text-gray-400">
+                {editingId !== null
+                  ? "Altere as informações do produto."
+                  : "Cadastre novos produtos sem precisar alterar o código do site."}
+              </p>
+            </div>
+
+            {editingId !== null && (
+              <button
+                type="button"
+                onClick={clearForm}
+                className="rounded-xl border border-white/10 px-4 py-2 text-sm hover:bg-white/10"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+
+          <form
+            onSubmit={saveProduct}
+            className="mt-6 grid gap-4"
+          >
 
             <div>
               <label className="mb-2 block text-sm font-medium">
@@ -234,6 +343,8 @@ export default function AdminPage() {
             >
               {saving
                 ? "Salvando..."
+                : editingId !== null
+                ? "SALVAR ALTERAÇÕES"
                 : "+ ADICIONAR PRODUTO"}
             </button>
 
@@ -242,9 +353,15 @@ export default function AdminPage() {
 
         <section className="mt-8">
 
-          <h2 className="mb-4 text-2xl font-bold">
-            Produtos cadastrados
-          </h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">
+              Produtos cadastrados
+            </h2>
+
+            <span className="rounded-full bg-white/10 px-3 py-1 text-sm text-gray-300">
+              {products.length}
+            </span>
+          </div>
 
           {loading ? (
             <p className="text-gray-400">
@@ -263,21 +380,84 @@ export default function AdminPage() {
                   className="rounded-2xl border border-white/10 bg-white/[0.04] p-5"
                 >
 
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-                    <div>
-                      <h3 className="font-bold">
-                        {product.name}
-                      </h3>
+                    <div className="min-w-0">
 
-                      <p className="mt-1 text-sm text-gray-400">
-                        R$ {Number(product.price).toFixed(2)}
-                      </p>
+                      <div className="flex items-center gap-3">
+
+                        {product.image_url && (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="h-14 w-14 rounded-xl object-cover"
+                          />
+                        )}
+
+                        <div>
+                          <h3 className="font-bold">
+                            {product.name}
+                          </h3>
+
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+
+                            <span className="text-orange-400">
+                              R$ {Number(product.price).toFixed(2)}
+                            </span>
+
+                            {product.old_price !== null && (
+                              <span className="text-gray-500 line-through">
+                                R$ {Number(product.old_price).toFixed(2)}
+                              </span>
+                            )}
+
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {product.description && (
+                        <p className="mt-3 line-clamp-2 text-sm text-gray-400">
+                          {product.description}
+                        </p>
+                      )}
+
                     </div>
 
-                    <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs text-green-400">
-                      Ativo
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs ${
+                          product.active
+                            ? "bg-green-500/10 text-green-400"
+                            : "bg-red-500/10 text-red-400"
+                        }`}
+                      >
+                        {product.active ? "Ativo" : "Inativo"}
+                      </span>
+
+                      <button
+                        onClick={() => editProduct(product)}
+                        className="rounded-xl border border-white/10 px-3 py-2 text-sm hover:bg-white/10"
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        onClick={() => toggleProduct(product)}
+                        className="rounded-xl border border-white/10 px-3 py-2 text-sm hover:bg-white/10"
+                      >
+                        {product.active ? "Desativar" : "Ativar"}
+                      </button>
+
+                      <button
+                        onClick={() => deleteProduct(product)}
+                        className="rounded-xl border border-red-500/20 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10"
+                      >
+                        Excluir
+                      </button>
+
+                    </div>
 
                   </div>
 
