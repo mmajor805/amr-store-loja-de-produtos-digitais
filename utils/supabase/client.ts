@@ -1,15 +1,12 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-export const createClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseUrl = "https://vdypyryzlbpkktqticns.supabase.co";
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Supabase environment variables are missing.");
-  }
+const supabaseKey =
+  "sb_publishable_mJOeqC6Kv5Yz1C8dqObQQw_xLqySUQ0";
 
-  return createBrowserClient(
+export const createClient = () =>
+  createBrowserClient(
     supabaseUrl,
     supabaseKey
   );
-};
