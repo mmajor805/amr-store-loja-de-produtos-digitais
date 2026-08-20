@@ -1,4 +1,7 @@
-import { createClient } from "../utils/supabase/server";
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "../utils/supabase/client";
 
 type Product = {
   id: number;
@@ -11,37 +14,47 @@ type Product = {
   active: boolean;
 };
 
-export const dynamic = "force-dynamic";
+export default function Home() {
+  const supabase = createClient();
 
-export default async function Home() {
-  const supabase = await createClient();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const { data: products } = await supabase
-    .from("products")
-    .select(
-      "id, name, description, price, old_price, image_url, purchase_url, active"
-    )
-    .eq("active", true)
-    .order("created_at", { ascending: false });
+  useEffect(() => {
+    async function loadProducts() {
+      const { data, error } = await supabase
+        .from("products")
+        .select(
+          "id, name, description, price, old_price, image_url, purchase_url, active"
+        )
+        .eq("active", true)
+        .order("created_at", { ascending: false });
 
-  const activeProducts: Product[] = products || [];
+      if (error) {
+        console.error("Erro ao carregar produtos:", error);
+        setProducts([]);
+      } else {
+        setProducts(data || []);
+      }
+
+      setLoading(false);
+    }
+
+    loadProducts();
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#080808] text-white">
 
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-
-          <div>
-            <h1 className="text-xl font-bold">
-              AMR<span className="text-orange-500">.</span>STORE
-            </h1>
-          </div>
+          <h1 className="text-xl font-bold">
+            AMR<span className="text-orange-500">.</span>STORE
+          </h1>
 
           <span className="text-sm text-gray-400">
             Produtos Digitais
           </span>
-
         </div>
       </header>
 
@@ -70,26 +83,26 @@ export default async function Home() {
       <section className="px-5 pb-20">
         <div className="mx-auto max-w-6xl">
 
-          <div className="mb-8">
-            <h3 className="text-2xl font-bold">
-              Produtos em destaque
-            </h3>
+          <h3 className="mb-8 text-2xl font-bold">
+            Produtos em destaque
+          </h3>
 
-            <p className="mt-2 text-gray-400">
-              Escolha o conteúdo ideal para suas redes.
-            </p>
-          </div>
+          {loading ? (
 
-          {activeProducts.length === 0 ? (
+            <div className="rounded-3xl border border-white/10 p-10 text-center text-gray-400">
+              Carregando produtos...
+            </div>
 
-            <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center">
+          ) : products.length === 0 ? (
+
+            <div className="rounded-3xl border border-white/10 p-10 text-center">
 
               <h4 className="text-xl font-bold">
-                Nenhum produto disponível
+                Nenhum produto encontrado
               </h4>
 
               <p className="mt-2 text-gray-400">
-                Novos produtos estarão disponíveis em breve.
+                Não foi possível encontrar produtos ativos.
               </p>
 
             </div>
@@ -98,7 +111,7 @@ export default async function Home() {
 
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 
-              {activeProducts.map((product) => (
+              {products.map((product) => (
 
                 <article
                   key={product.id}
@@ -106,7 +119,6 @@ export default async function Home() {
                 >
 
                   {product.image_url ? (
-
                     <div className="h-52 overflow-hidden bg-black">
                       <img
                         src={product.image_url}
@@ -114,13 +126,9 @@ export default async function Home() {
                         className="h-full w-full object-cover"
                       />
                     </div>
-
                   ) : (
-
                     <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
-
                       <div className="text-center">
-
                         <div className="text-4xl font-black">
                           AMR
                         </div>
@@ -128,35 +136,24 @@ export default async function Home() {
                         <div className="mt-1 text-sm uppercase tracking-widest text-orange-400">
                           Produto Digital
                         </div>
-
                       </div>
-
                     </div>
-
                   )}
 
                   <div className="p-6">
 
-                    {product.old_price !== null &&
-                      Number(product.old_price) >
-                        Number(product.price) && (
-
-                      <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-black">
-                        OFERTA
-                      </span>
-
-                    )}
+                    <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-black">
+                      OFERTA
+                    </span>
 
                     <h4 className="mt-5 text-xl font-bold">
                       {product.name}
                     </h4>
 
                     {product.description && (
-
                       <p className="mt-3 text-sm leading-6 text-gray-400">
                         {product.description}
                       </p>
-
                     )}
 
                     <div className="mt-6">
@@ -174,7 +171,6 @@ export default async function Home() {
                     </div>
 
                     {product.purchase_url ? (
-
                       <a
                         href={product.purchase_url}
                         target="_blank"
@@ -183,16 +179,13 @@ export default async function Home() {
                       >
                         QUERO MEU PRODUTO
                       </a>
-
                     ) : (
-
                       <button
                         disabled
-                        className="mt-6 w-full cursor-not-allowed rounded-xl bg-white/10 px-5 py-4 font-bold text-gray-500"
+                        className="mt-6 w-full rounded-xl bg-white/10 px-5 py-4 font-bold text-gray-500"
                       >
                         COMPRA EM BREVE
                       </button>
-
                     )}
 
                   </div>
