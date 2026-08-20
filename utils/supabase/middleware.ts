@@ -6,18 +6,27 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    "https://vdypyryzlbpkktqticns.supabase.co";
+
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    "sb_publishable_mJOeqC6Kv5Yz1C8dqObQQw_xLqySUQ0";
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
+
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
 
           response = NextResponse.next({
             request,
