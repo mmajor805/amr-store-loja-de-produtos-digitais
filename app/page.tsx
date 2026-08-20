@@ -15,13 +15,14 @@ type Product = {
 };
 
 export default function Home() {
-  const supabase = createClient();
-
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function loadProducts() {
+      const supabase = createClient();
+
       const { data, error } = await supabase
         .from("products")
         .select(
@@ -32,6 +33,7 @@ export default function Home() {
 
       if (error) {
         console.error("Erro ao carregar produtos:", error);
+        setErrorMessage(error.message);
         setProducts([]);
       } else {
         setProducts(data || []);
@@ -45,7 +47,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#080808] text-white">
-
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
           <h1 className="text-xl font-bold">
@@ -60,7 +61,6 @@ export default function Home() {
 
       <section className="px-5 pb-16 pt-16">
         <div className="mx-auto max-w-4xl text-center">
-
           <span className="inline-block rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-medium text-orange-400">
             CONTEÚDO DIGITAL
           </span>
@@ -76,48 +76,52 @@ export default function Home() {
             Encontre packs de conteúdos digitais prontos para facilitar sua
             criação e ajudar você a manter suas redes sempre movimentadas.
           </p>
-
         </div>
       </section>
 
       <section className="px-5 pb-20">
         <div className="mx-auto max-w-6xl">
+          <div className="mb-8">
+            <h3 className="text-2xl font-bold">
+              Produtos em destaque
+            </h3>
 
-          <h3 className="mb-8 text-2xl font-bold">
-            Produtos em destaque
-          </h3>
+            <p className="mt-2 text-gray-400">
+              Escolha o conteúdo ideal para suas redes.
+            </p>
+          </div>
 
-          {loading ? (
+          {errorMessage ? (
+            <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-8">
+              <h4 className="text-xl font-bold text-red-400">
+                Erro ao carregar produtos
+              </h4>
 
+              <p className="mt-3 break-words text-sm leading-6 text-red-300">
+                {errorMessage}
+              </p>
+            </div>
+          ) : loading ? (
             <div className="rounded-3xl border border-white/10 p-10 text-center text-gray-400">
               Carregando produtos...
             </div>
-
           ) : products.length === 0 ? (
-
-            <div className="rounded-3xl border border-white/10 p-10 text-center">
-
+            <div className="rounded-3xl border border-dashed border-white/10 p-10 text-center">
               <h4 className="text-xl font-bold">
                 Nenhum produto encontrado
               </h4>
 
               <p className="mt-2 text-gray-400">
-                Não foi possível encontrar produtos ativos.
+                Não existem produtos ativos disponíveis no momento.
               </p>
-
             </div>
-
           ) : (
-
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-
               {products.map((product) => (
-
                 <article
                   key={product.id}
                   className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl"
                 >
-
                   {product.image_url ? (
                     <div className="h-52 overflow-hidden bg-black">
                       <img
@@ -141,7 +145,6 @@ export default function Home() {
                   )}
 
                   <div className="p-6">
-
                     <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-black">
                       OFERTA
                     </span>
@@ -157,17 +160,21 @@ export default function Home() {
                     )}
 
                     <div className="mt-6">
-
                       {product.old_price !== null && (
                         <span className="text-sm text-gray-500 line-through">
-                          R$ {Number(product.old_price).toFixed(2).replace(".", ",")}
+                          R${" "}
+                          {Number(product.old_price)
+                            .toFixed(2)
+                            .replace(".", ",")}
                         </span>
                       )}
 
                       <div className="mt-1 text-3xl font-black">
-                        R$ {Number(product.price).toFixed(2).replace(".", ",")}
+                        R${" "}
+                        {Number(product.price)
+                          .toFixed(2)
+                          .replace(".", ",")}
                       </div>
-
                     </div>
 
                     {product.purchase_url ? (
@@ -182,29 +189,22 @@ export default function Home() {
                     ) : (
                       <button
                         disabled
-                        className="mt-6 w-full rounded-xl bg-white/10 px-5 py-4 font-bold text-gray-500"
+                        className="mt-6 w-full cursor-not-allowed rounded-xl bg-white/10 px-5 py-4 font-bold text-gray-500"
                       >
                         COMPRA EM BREVE
                       </button>
                     )}
-
                   </div>
-
                 </article>
-
               ))}
-
             </div>
-
           )}
-
         </div>
       </section>
 
       <footer className="border-t border-white/10 px-5 py-8 text-center text-sm text-gray-500">
         © 2026 AMR.STORE — Todos os direitos reservados.
       </footer>
-
     </main>
   );
 }
