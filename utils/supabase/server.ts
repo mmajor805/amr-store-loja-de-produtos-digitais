@@ -1,14 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-const supabaseUrl =
-  "https://vdypyryzlbpkktqticns.supabase.co";
-
-const supabaseKey =
-  "sb_publishable_mJOeqC6Kv5Yz1C8dqObQQw_xLqySUQ0";
-
 export async function createClient() {
   const cookieStore = await cookies();
+
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    "https://vdypyryzlbpkktqticns.supabase.co";
+
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    "sb_publishable_mJOeqC6Kv5Yz1C8dqObQQw_xLqySUQ0";
 
   return createServerClient(
     supabaseUrl,
@@ -27,10 +29,11 @@ export async function createClient() {
               }
             );
           } catch {
-            // Pode ser ignorado em Server Components.
+            // Os cookies podem não poder ser alterados
+            // durante uma renderização do servidor.
           }
         },
-      },
+      }
     }
   );
 }
