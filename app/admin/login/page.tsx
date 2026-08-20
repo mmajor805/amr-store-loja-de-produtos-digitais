@@ -1,8 +1,10 @@
 "use client";
-export const dynamic = "force-dynamic";
+
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../utils/supabase/client";
+
+export const dynamic = "force-dynamic";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -19,24 +21,39 @@ export default function AdminLogin() {
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const cleanEmail = email.trim();
+
+    const { data, error: loginError } =
+      await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+
+    console.log("LOGIN RESULT:", {
+      user: data.user?.email,
+      error: loginError?.message,
     });
 
-    if (error) {
-      setError("E-mail ou senha incorretos.");
+    if (loginError) {
+      setError(loginError.message);
       setLoading(false);
       return;
     }
 
-    router.push("/admin");
+    if (!data.user) {
+      setError("Login realizado, mas o usuário não foi encontrado.");
+      setLoading(false);
+      return;
+    }
+
+    router.replace("/admin");
     router.refresh();
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#080808] px-5 text-white">
       <div className="w-full max-w-md">
+
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-black">
             AMR<span className="text-orange-500">.</span>STORE
@@ -51,6 +68,7 @@ export default function AdminLogin() {
           onSubmit={handleLogin}
           className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl"
         >
+
           <h2 className="text-2xl font-bold">
             Entrar
           </h2>
@@ -60,6 +78,7 @@ export default function AdminLogin() {
           </p>
 
           <div className="mt-6">
+
             <label className="mb-2 block text-sm font-medium">
               E-mail
             </label>
@@ -69,12 +88,15 @@ export default function AdminLogin() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="seu@email.com"
+              autoComplete="email"
               required
               className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-orange-500"
             />
+
           </div>
 
           <div className="mt-4">
+
             <label className="mb-2 block text-sm font-medium">
               Senha
             </label>
@@ -84,15 +106,17 @@ export default function AdminLogin() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"
+              autoComplete="current-password"
               required
               className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-white outline-none focus:border-orange-500"
             />
+
           </div>
 
           {error && (
-            <p className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-400">
+            <div className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-400">
               {error}
-            </p>
+            </div>
           )}
 
           <button
@@ -102,7 +126,9 @@ export default function AdminLogin() {
           >
             {loading ? "Entrando..." : "ENTRAR NO PAINEL"}
           </button>
+
         </form>
+
       </div>
     </main>
   );
