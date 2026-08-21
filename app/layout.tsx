@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { CartProvider } from "./context/CartContext";
 
 export const metadata: Metadata = {
-  title: "Sua Loja",
-  description: "Produtos digitais de alta qualidade.",
+  title: "AMR.STORE — Loja Digital",
+  description:
+    "Produtos digitais, entretenimento, livros, cursos e muito mais.",
 };
 
 export default function RootLayout({
@@ -13,7 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <CartProvider>
+          {children}
+        </CartProvider>
+      </body>
     </html>
   );
 }
