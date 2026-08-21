@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "../utils/supabase/client";
+import { useCart } from "./context/CartContext";
 
 type Product = {
   id: number;
@@ -33,6 +34,8 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [loading, setLoading] = useState(true);
+
+  const { addToCart, cartCount } = useCart();
 
   useEffect(() => {
     async function loadProducts() {
@@ -90,6 +93,17 @@ export default function Home() {
     });
   }, [products, search, selectedCategory]);
 
+  function handleAddToCart(product: Product) {
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: Number(product.price ?? 0),
+      image_url: product.image_url,
+    });
+
+    alert("Produto adicionado ao carrinho!");
+  }
+
   return (
     <main className="min-h-screen bg-[#080808] text-white">
 
@@ -106,9 +120,26 @@ export default function Home() {
             AMR<span className="text-orange-500">.</span>STORE
           </a>
 
-          <span className="text-sm text-gray-400">
-            Loja Digital
-          </span>
+          <div className="flex items-center gap-5">
+
+            <span className="hidden text-sm text-gray-400 sm:block">
+              Loja Digital
+            </span>
+
+            <a
+              href="/carrinho"
+              className="relative rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold transition hover:border-orange-500/40"
+            >
+              🛒 Carrinho
+
+              {cartCount > 0 && (
+                <span className="ml-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-black text-black">
+                  {cartCount}
+                </span>
+              )}
+            </a>
+
+          </div>
 
         </div>
 
@@ -228,31 +259,25 @@ export default function Home() {
 
         <div className="mx-auto max-w-6xl">
 
-          <div className="mb-8 flex items-end justify-between gap-4">
+          <div className="mb-8">
 
-            <div>
+            <h2 className="text-2xl font-bold">
+              {search.trim()
+                ? `Resultados para "${search}"`
+                : selectedCategory === "Todos"
+                ? "Produtos em destaque"
+                : selectedCategory}
+            </h2>
 
-              <h2 className="text-2xl font-bold">
+            <p className="mt-2 text-gray-400">
 
-                {search.trim()
-                  ? `Resultados para "${search}"`
-                  : selectedCategory === "Todos"
-                  ? "Produtos em destaque"
-                  : selectedCategory}
+              {filteredProducts.length}{" "}
 
-              </h2>
+              {filteredProducts.length === 1
+                ? "produto encontrado"
+                : "produtos encontrados"}
 
-              <p className="mt-2 text-gray-400">
-
-                {filteredProducts.length}{" "}
-
-                {filteredProducts.length === 1
-                  ? "produto encontrado"
-                  : "produtos encontrados"}
-
-              </p>
-
-            </div>
+            </p>
 
           </div>
 
@@ -289,30 +314,6 @@ export default function Home() {
                   Tente pesquisar por outro termo ou selecione
                   outra categoria.
                 </p>
-
-                <div className="mt-6 flex flex-wrap justify-center gap-3">
-
-                  {search && (
-                    <button
-                      onClick={() => setSearch("")}
-                      className="rounded-xl bg-orange-500 px-5 py-3 font-bold text-black"
-                    >
-                      LIMPAR PESQUISA
-                    </button>
-                  )}
-
-                  {selectedCategory !== "Todos" && (
-                    <button
-                      onClick={() =>
-                        setSelectedCategory("Todos")
-                      }
-                      className="rounded-xl border border-white/10 px-5 py-3 font-bold text-white"
-                    >
-                      VER TODOS
-                    </button>
-                  )}
-
-                </div>
 
               </div>
 
@@ -452,14 +453,27 @@ export default function Home() {
 
                         </div>
 
-                        {/* BOTÃO */}
+                        {/* BOTÕES */}
 
-                        <a
-                          href={`/produto/${product.id}`}
-                          className="mt-6 block w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-black text-black transition hover:bg-orange-400"
-                        >
-                          VER PRODUTO
-                        </a>
+                        <div className="mt-6 grid gap-3">
+
+                          <button
+                            onClick={() =>
+                              handleAddToCart(product)
+                            }
+                            className="w-full rounded-xl border border-orange-500 bg-orange-500/10 px-5 py-4 font-black text-orange-400 transition hover:bg-orange-500 hover:text-black"
+                          >
+                            🛒 ADICIONAR AO CARRINHO
+                          </button>
+
+                          <a
+                            href={`/produto/${product.id}`}
+                            className="w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-black text-black transition hover:bg-orange-400"
+                          >
+                            VER PRODUTO
+                          </a>
+
+                        </div>
 
                       </div>
 
