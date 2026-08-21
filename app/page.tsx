@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createClient } from "../utils/supabase/client";
 
 type Product = {
   id: number;
@@ -20,18 +21,24 @@ export default function Home() {
   useEffect(() => {
     async function loadProducts() {
       try {
-        const response = await fetch("/api/products");
+        const supabase = createClient();
 
-        if (!response.ok) {
-          throw new Error("Erro ao carregar produtos");
+        const { data, error } = await supabase
+          .from("products")
+          .select(
+            "id, name, description, price, old_price, image_url, purchase_url, active"
+          )
+          .eq("active", true)
+          .order("id", { ascending: false });
+
+        if (error) {
+          console.error("Erro ao carregar produtos:", error);
+          return;
         }
-
-        const data = await response.json();
 
         setProducts(data || []);
       } catch (error) {
-        console.error(error);
-        setProducts([]);
+        console.error("Erro inesperado:", error);
       } finally {
         setLoading(false);
       }
@@ -43,13 +50,11 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#080808] text-white">
 
+      {/* HEADER */}
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
 
-          <a
-            href="/"
-            className="text-xl font-bold"
-          >
+          <a href="/" className="text-xl font-bold">
             AMR<span className="text-orange-500">.</span>STORE
           </a>
 
@@ -60,6 +65,7 @@ export default function Home() {
         </div>
       </header>
 
+      {/* HERO */}
       <section className="px-5 pb-16 pt-16">
 
         <div className="mx-auto max-w-4xl text-center">
@@ -84,6 +90,7 @@ export default function Home() {
 
       </section>
 
+      {/* PRODUTOS */}
       <section className="px-5 pb-20">
 
         <div className="mx-auto max-w-6xl">
@@ -98,109 +105,113 @@ export default function Home() {
             </p>
           </div>
 
-          {loading ? (
-
-            <div className="py-10 text-center text-gray-400">
-              Carregando produtos...
+          {/* CARREGANDO */}
+          {loading && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-10 text-center">
+              <p className="text-gray-400">
+                Carregando produtos...
+              </p>
             </div>
+          )}
 
-          ) : products.length === 0 ? (
-
-            <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-gray-400">
-              Nenhum produto disponível no momento.
+          {/* SEM PRODUTOS */}
+          {!loading && products.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center">
+              <p className="text-gray-400">
+                Nenhum produto disponível no momento.
+              </p>
             </div>
+          )}
 
-          ) : (
-
+          {/* PRODUTOS */}
+          {!loading && products.length > 0 && (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 
               {products.map((product) => (
 
                 <article
                   key={product.id}
-                  className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl transition hover:-translate-y-1 hover:border-orange-500/40"
+                  className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl transition duration-300 hover:-translate-y-1 hover:border-orange-500/40"
                 >
 
+                  {/* IMAGEM / CAPA */}
                   <a
                     href={`/produto/${product.id}`}
                     className="block"
                   >
 
-                    <div className="relative">
+                    {product.image_url ? (
 
-                      {product.image_url ? (
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="h-52 w-full object-cover"
+                      />
 
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="h-52 w-full object-cover"
-                        />
+                    ) : (
 
-                      ) : (
+                      <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
 
-                        <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
+                        <div className="text-center">
 
-                          <div className="text-center">
+                          <div className="text-5xl font-black">
+                            AMR
+                          </div>
 
-                            <div className="text-5xl font-black">
-                              AMR
-                            </div>
-
-                            <div className="mt-1 text-sm uppercase tracking-widest text-orange-400">
-                              Produto Digital
-                            </div>
-
+                          <div className="mt-1 text-sm uppercase tracking-widest text-orange-400">
+                            Produto Digital
                           </div>
 
                         </div>
 
-                      )}
+                      </div>
 
-                    </div>
+                    )}
 
-                    <div className="p-6">
+                  </a>
 
-                      <span className="inline-block rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-black">
-                        PRODUTO DIGITAL
-                      </span>
+                  {/* INFORMAÇÕES */}
+                  <div className="p-6">
 
-                      <h3 className="mt-5 text-xl font-bold">
-                        {product.name}
-                      </h3>
+                    <span className="inline-block rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-black">
+                      PRODUTO DIGITAL
+                    </span>
 
-                      {product.description && (
-                        <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-400">
-                          {product.description}
-                        </p>
-                      )}
+                    <h3 className="mt-5 text-xl font-bold">
+                      {product.name}
+                    </h3>
 
-                      <div className="mt-6">
+                    {product.description && (
+                      <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-400">
+                        {product.description}
+                      </p>
+                    )}
 
-                        {product.old_price !== null && (
-                          <span className="text-sm text-gray-500 line-through">
-                            R$ {Number(product.old_price)
-                              .toFixed(2)
-                              .replace(".", ",")}
-                          </span>
-                        )}
+                    {/* PREÇO */}
+                    <div className="mt-6">
 
-                        <div className="mt-1 text-3xl font-black">
-                          R$ {Number(product.price ?? 0)
+                      {product.old_price !== null && (
+                        <div className="text-sm text-gray-500 line-through">
+                          R${" "}
+                          {Number(product.old_price)
                             .toFixed(2)
                             .replace(".", ",")}
                         </div>
+                      )}
 
+                      <div className="mt-1 text-3xl font-black">
+                        R${" "}
+                        {Number(product.price ?? 0)
+                          .toFixed(2)
+                          .replace(".", ",")}
                       </div>
 
                     </div>
 
-                  </a>
-
-                  <div className="px-6 pb-6">
-
+                    {/* BOTÃO */}
                     <a
                       href={`/produto/${product.id}`}
-                      className="block w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-bold text-black transition hover:bg-orange-400"
+                      className="mt-6 block w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-bold text-black transition hover:bg-orange-400"
                     >
                       VER PRODUTO
                     </a>
@@ -212,13 +223,13 @@ export default function Home() {
               ))}
 
             </div>
-
           )}
 
         </div>
 
       </section>
 
+      {/* FOOTER */}
       <footer className="border-t border-white/10 px-5 py-8 text-center text-sm text-gray-500">
         © 2026 AMR.STORE — Todos os direitos reservados.
       </footer>
