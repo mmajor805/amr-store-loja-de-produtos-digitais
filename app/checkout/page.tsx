@@ -4,6 +4,17 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useCart } from "../context/CartContext";
 
+type PixData = {
+  id: string;
+  status: string;
+  payment_method: string;
+  total_amount: number;
+  pix?: {
+    code?: string;
+    qrcode_base64?: string;
+  };
+};
+
 export default function CheckoutPage() {
   const { cart, cartTotal } = useCart();
 
@@ -11,17 +22,132 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const [loading, setLoading] = useState(false);
+  const [pix, setPix] = useState<PixData | null>(null);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!name || !email || !whatsapp) {
-      alert("Preencha todos os campos.");
+    setError("");
+    setCopied(false);
+
+    if (cart.length === 0) {
+      setError("Seu carrinho está vazio.");
       return;
     }
 
-    alert(
-      "Dados preenchidos com sucesso! O pagamento será configurado na próxima etapa."
-    );
+    if (!name.trim()) {
+      setError("Digite seu nome completo.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setError("Digite seu e-mail.");
+      return;
+    }
+
+    if (!whatsapp.trim()) {
+      setError("Digite seu WhatsApp.");
+      return;
+    }
+
+    if (cartTotal < 6) {
+      setError(
+        "O valor mínimo para pagamento via Pix é R$ 6,00."
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const externalId =
+        `pedido-${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 8)}`;
+
+      const response = await fetch(
+        "/api/pixou/charge",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            external_id: externalId,
+
+            amount: Math.round(
+              cartTotal * 100
+            ),
+
+            buyer: {
+              name: name.trim(),
+              email: email.trim(),
+              phone: whatsapp.replace(/\D/g, ""),
+            },
+
+            product: {
+              name:
+                cart.length === 1
+                  ? cart[0].name
+                  : `${cart.length} produtos AMR.STORE`,
+            },
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result?.error ||
+            "Não foi possível criar o pagamento."
+        );
+      }
+
+      if (!result?.data?.pix?.code) {
+        throw new Error(
+          "A Pixou Pay não retornou o código Pix."
+        );
+      }
+
+      setPix(result.data);
+    } catch (err) {
+      console.error(
+        "Erro ao criar pagamento:",
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao criar pagamento."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function copyPix() {
+    if (!pix?.pix?.code) return;
+
+    try {
+      await navigator.clipboard.writeText(
+        pix.pix.code
+      );
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 3000);
+    } catch {
+      setError(
+        "Não foi possível copiar automaticamente. Selecione o código manualmente."
+      );
+    }
   }
 
   return (
@@ -67,14 +193,14 @@ export default function CheckoutPage() {
             </h1>
 
             <p className="mt-3 text-gray-400">
-              Preencha seus dados para continuar.
+              Preencha seus dados e gere seu pagamento Pix.
             </p>
 
           </div>
 
           {/* CARRINHO VAZIO */}
 
-          {cart.length === 0 && (
+          {cart.length === 0 && !pix && (
 
             <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.02] p-12 text-center">
 
@@ -87,7 +213,7 @@ export default function CheckoutPage() {
               </h2>
 
               <p className="mt-3 text-gray-500">
-                Adicione pelo menos um produto antes de finalizar a compra.
+                Adicione um produto antes de finalizar a compra.
               </p>
 
               <Link
@@ -101,13 +227,112 @@ export default function CheckoutPage() {
 
           )}
 
-          {/* CHECKOUT */}
+          {/* PAGAMENTO GERADO */}
 
-          {cart.length > 0 && (
+          {pix && (
+
+            <div className="mx-auto max-w-lg">
+
+              <div className="rounded-3xl border border-green-500/20 bg-white/[0.04] p-6 text-center sm:p-8">
+
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 text-3xl">
+                  ✓
+                </div>
+
+                <h2 className="mt-5 text-2xl font-black">
+                  Pix gerado!
+                </h2>
+
+                <p className="mt-2 text-gray-400">
+                  Escaneie o QR Code ou copie o código Pix.
+                </p>
+
+                {/* VALOR */}
+
+                <div className="mt-6">
+
+                  <p className="text-sm text-gray-500">
+                    Valor da compra
+                  </p>
+
+                  <p className="mt-1 text-4xl font-black text-orange-500">
+                    R${" "}
+                    {(
+                      pix.total_amount / 100
+                    )
+                      .toFixed(2)
+                      .replace(".", ",")}
+                  </p>
+
+                </div>
+
+                {/* QR CODE */}
+
+                {pix.pix?.qrcode_base64 && (
+
+                  <div className="mx-auto mt-7 flex w-fit rounded-2xl bg-white p-4">
+
+                    <img
+                      src={`data:image/png;base64,${pix.pix.qrcode_base64}`}
+                      alt="QR Code Pix"
+                      className="h-64 w-64"
+                    />
+
+                  </div>
+
+                )}
+
+                {/* PIX COPIA E COLA */}
+
+                <div className="mt-7 text-left">
+
+                  <label className="mb-2 block text-sm font-bold">
+                    Pix Copia e Cola
+                  </label>
+
+                  <textarea
+                    readOnly
+                    value={pix.pix?.code || ""}
+                    className="h-28 w-full resize-none rounded-xl border border-white/10 bg-black/50 p-3 text-xs leading-5 text-gray-300 outline-none"
+                  />
+
+                </div>
+
+                {/* COPIAR */}
+
+                <button
+                  onClick={copyPix}
+                  className="mt-4 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400"
+                >
+                  {copied
+                    ? "✓ PIX COPIADO"
+                    : "COPIAR PIX"}
+                </button>
+
+                <div className="mt-6 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-left">
+
+                  <p className="text-sm font-bold text-yellow-400">
+                    Importante
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5 text-gray-500">
+                    Após realizar o pagamento, aguarde a confirmação.
+                    Não feche esta página imediatamente.
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          )}
+
+          {/* FORMULÁRIO */}
+
+          {!pix && cart.length > 0 && (
 
             <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
-
-              {/* FORMULÁRIO */}
 
               <form
                 onSubmit={handleSubmit}
@@ -119,9 +344,18 @@ export default function CheckoutPage() {
                 </h2>
 
                 <p className="mt-2 text-sm text-gray-500">
-                  Usaremos esses dados para identificar sua compra e enviar
-                  as informações do pedido.
+                  Esses dados serão associados ao seu pedido.
                 </p>
+
+                {/* ERRO */}
+
+                {error && (
+
+                  <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+                    {error}
+                  </div>
+
+                )}
 
                 {/* NOME */}
 
@@ -143,7 +377,8 @@ export default function CheckoutPage() {
                     }
                     placeholder="Digite seu nome"
                     required
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-500"
+                    disabled={loading}
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
                   />
 
                 </div>
@@ -168,7 +403,8 @@ export default function CheckoutPage() {
                     }
                     placeholder="seuemail@email.com"
                     required
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-500"
+                    disabled={loading}
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
                   />
 
                 </div>
@@ -193,7 +429,8 @@ export default function CheckoutPage() {
                     }
                     placeholder="(91) 99999-9999"
                     required
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-500"
+                    disabled={loading}
+                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
                   />
 
                 </div>
@@ -211,12 +448,11 @@ export default function CheckoutPage() {
                     <div>
 
                       <p className="font-bold text-green-400">
-                        Seus dados estão seguros
+                        Pagamento seguro
                       </p>
 
                       <p className="mt-1 text-xs leading-5 text-gray-500">
-                        Seus dados serão utilizados somente para processar
-                        seu pedido.
+                        O pagamento Pix será processado pela Pixou Pay.
                       </p>
 
                     </div>
@@ -229,9 +465,12 @@ export default function CheckoutPage() {
 
                 <button
                   type="submit"
-                  className="mt-7 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400"
+                  disabled={loading}
+                  className="mt-7 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  PAGAR AGORA
+                  {loading
+                    ? "GERANDO PIX..."
+                    : "GERAR PAGAMENTO PIX"}
                 </button>
 
               </form>
@@ -253,13 +492,9 @@ export default function CheckoutPage() {
                       className="flex items-start justify-between gap-4"
                     >
 
-                      <div className="min-w-0">
-
-                        <p className="font-medium leading-5">
-                          {product.name}
-                        </p>
-
-                      </div>
+                      <p className="min-w-0 font-medium leading-5">
+                        {product.name}
+                      </p>
 
                       <span className="whitespace-nowrap font-bold">
                         R${" "}
