@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, Link } from "next/navigation";
-import { createClient } from "../../../utils/supabase/client";
+import { useParams } from "next/navigation";
 
 type Product = {
   id: number;
@@ -25,23 +24,22 @@ export default function ProductPage() {
 
   useEffect(() => {
     async function loadProduct() {
-      const supabase = createClient();
+      try {
+        const response = await fetch(`/api/products/${id}`);
 
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .eq("active", true)
-        .single();
+        if (!response.ok) {
+          throw new Error("Produto não encontrado");
+        }
 
-      if (error) {
-        console.error(error);
-        setError("Produto não encontrado.");
-      } else {
+        const data = await response.json();
+
         setProduct(data);
+      } catch (err) {
+        console.error(err);
+        setError("Produto não encontrado.");
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     }
 
     if (id) {
@@ -52,7 +50,9 @@ export default function ProductPage() {
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#080808] text-white">
-        <p className="text-gray-400">Carregando produto...</p>
+        <p className="text-gray-400">
+          Carregando produto...
+        </p>
       </main>
     );
   }
@@ -69,12 +69,12 @@ export default function ProductPage() {
             Esse produto pode ter sido removido ou desativado.
           </p>
 
-          <Link
+          <a
             href="/"
             className="mt-6 inline-block rounded-xl bg-orange-500 px-6 py-4 font-bold text-black"
           >
             VOLTAR PARA A LOJA
-          </Link>
+          </a>
         </div>
       </main>
     );
@@ -86,19 +86,19 @@ export default function ProductPage() {
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
 
-          <Link
+          <a
             href="/"
             className="text-xl font-bold"
           >
             AMR<span className="text-orange-500">.</span>STORE
-          </Link>
+          </a>
 
-          <Link
+          <a
             href="/"
-            className="text-sm text-gray-400"
+            className="text-sm text-gray-400 hover:text-white"
           >
             ← Voltar para a loja
-          </Link>
+          </a>
 
         </div>
       </header>
@@ -118,6 +118,7 @@ export default function ProductPage() {
             ) : (
               <div className="flex h-[350px] items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black sm:h-[500px]">
                 <div className="text-center">
+
                   <div className="text-6xl font-black">
                     AMR
                   </div>
@@ -125,6 +126,7 @@ export default function ProductPage() {
                   <div className="mt-2 text-sm uppercase tracking-[0.3em] text-orange-400">
                     Produto Digital
                   </div>
+
                 </div>
               </div>
             )}
@@ -170,7 +172,7 @@ export default function ProductPage() {
                 href={product.purchase_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-8 block w-full rounded-2xl bg-orange-500 px-6 py-5 text-center text-lg font-black text-black transition hover:bg-orange-400"
+                className="mt-8 block w-full rounded-2xl bg-orange-500 px-6 py-5 text-center text-lg font-black text-black hover:bg-orange-400"
               >
                 QUERO COMPRAR AGORA
               </a>
