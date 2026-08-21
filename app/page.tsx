@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "../utils/supabase/client";
 
 type Product = {
   id: number;
@@ -17,31 +16,22 @@ type Product = {
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadProducts() {
       try {
-        const supabase = createClient();
+        const response = await fetch("/api/products");
 
-        const result = await supabase
-          .from("products")
-          .select("*")
-          .eq("active", true)
-          .order("id", { ascending: false });
-
-        console.log("Produtos:", result.data);
-        console.log("Erro:", result.error);
-
-        if (result.error) {
-          setError(result.error.message);
-          setProducts([]);
-        } else {
-          setProducts(result.data || []);
+        if (!response.ok) {
+          throw new Error("Erro ao carregar produtos");
         }
-      } catch (err) {
-        console.error(err);
-        setError("Não foi possível conectar ao banco de dados.");
+
+        const data = await response.json();
+
+        setProducts(data || []);
+      } catch (error) {
+        console.error(error);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -56,9 +46,12 @@ export default function Home() {
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
 
-          <h1 className="text-xl font-bold">
+          <a
+            href="/"
+            className="text-xl font-bold"
+          >
             AMR<span className="text-orange-500">.</span>STORE
-          </h1>
+          </a>
 
           <span className="text-sm text-gray-400">
             Produtos Digitais
@@ -68,19 +61,19 @@ export default function Home() {
       </header>
 
       <section className="px-5 pb-16 pt-16">
+
         <div className="mx-auto max-w-4xl text-center">
 
           <span className="inline-block rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-medium text-orange-400">
             CONTEÚDO DIGITAL
           </span>
 
-          <h2 className="mt-6 text-4xl font-black leading-tight sm:text-6xl">
+          <h1 className="mt-6 text-4xl font-black leading-tight sm:text-6xl">
             Conteúdo pronto para você
-
             <span className="block text-orange-500">
               crescer nas redes sociais.
             </span>
-          </h2>
+          </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-gray-400 sm:text-lg">
             Encontre packs de conteúdos digitais prontos para facilitar sua
@@ -88,6 +81,7 @@ export default function Home() {
           </p>
 
         </div>
+
       </section>
 
       <section className="px-5 pb-20">
@@ -95,54 +89,28 @@ export default function Home() {
         <div className="mx-auto max-w-6xl">
 
           <div className="mb-8">
-
-            <h3 className="text-2xl font-bold">
+            <h2 className="text-2xl font-bold">
               Produtos em destaque
-            </h3>
+            </h2>
 
             <p className="mt-2 text-gray-400">
               Escolha o conteúdo ideal para suas redes.
             </p>
-
           </div>
 
-          {loading && (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-10 text-center">
-              <p className="text-gray-400">
-                Carregando produtos...
-              </p>
+          {loading ? (
+
+            <div className="py-10 text-center text-gray-400">
+              Carregando produtos...
             </div>
-          )}
 
-          {!loading && error && (
-            <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-8">
+          ) : products.length === 0 ? (
 
-              <h3 className="text-xl font-bold text-red-400">
-                Erro ao carregar produtos
-              </h3>
-
-              <p className="mt-3 break-words text-sm text-red-300">
-                {error}
-              </p>
-
+            <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-gray-400">
+              Nenhum produto disponível no momento.
             </div>
-          )}
 
-          {!loading && !error && products.length === 0 && (
-            <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-8 text-center">
-
-              <h3 className="text-xl font-bold text-yellow-400">
-                Nenhum produto encontrado
-              </h3>
-
-              <p className="mt-3 text-sm text-yellow-300">
-                Existem produtos no banco, mas nenhum foi retornado para a loja.
-              </p>
-
-            </div>
-          )}
-
-          {!loading && !error && products.length > 0 && (
+          ) : (
 
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 
@@ -150,104 +118,92 @@ export default function Home() {
 
                 <article
                   key={product.id}
-                  className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl"
+                  className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl transition hover:-translate-y-1 hover:border-orange-500/40"
                 >
 
-                  {product.image_url ? (
+                  <a
+                    href={`/produto/${product.id}`}
+                    className="block"
+                  >
 
-                    <div className="h-52 overflow-hidden bg-black">
+                    <div className="relative">
 
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="h-full w-full object-cover"
-                      />
+                      {product.image_url ? (
 
-                    </div>
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="h-52 w-full object-cover"
+                        />
 
-                  ) : (
+                      ) : (
 
-                    <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
+                        <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
 
-                      <div className="text-center">
+                          <div className="text-center">
 
-                        <div className="text-5xl font-black">
-                          AMR
+                            <div className="text-5xl font-black">
+                              AMR
+                            </div>
+
+                            <div className="mt-1 text-sm uppercase tracking-widest text-orange-400">
+                              Produto Digital
+                            </div>
+
+                          </div>
+
                         </div>
-
-                        <div className="mt-1 text-sm uppercase tracking-widest text-orange-400">
-                          Produto Digital
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                  )}
-
-                  <div className="p-6">
-
-                    <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-black">
-                      OFERTA
-                    </span>
-
-                    <h4 className="mt-5 text-xl font-bold">
-                      {product.name}
-                    </h4>
-
-                    {product.description && (
-
-                      <p className="mt-3 text-sm leading-6 text-gray-400">
-                        {product.description}
-                      </p>
-
-                    )}
-
-                    <div className="mt-6">
-
-                      {product.old_price !== null && (
-
-                        <span className="text-sm text-gray-500 line-through">
-                          R${" "}
-                          {Number(product.old_price)
-                            .toFixed(2)
-                            .replace(".", ",")}
-                        </span>
 
                       )}
 
-                      <div className="mt-1 text-3xl font-black">
+                    </div>
 
-                        R${" "}
-                        {Number(product.price ?? 0)
-                          .toFixed(2)
-                          .replace(".", ",")}
+                    <div className="p-6">
+
+                      <span className="inline-block rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-black">
+                        PRODUTO DIGITAL
+                      </span>
+
+                      <h3 className="mt-5 text-xl font-bold">
+                        {product.name}
+                      </h3>
+
+                      {product.description && (
+                        <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-400">
+                          {product.description}
+                        </p>
+                      )}
+
+                      <div className="mt-6">
+
+                        {product.old_price !== null && (
+                          <span className="text-sm text-gray-500 line-through">
+                            R$ {Number(product.old_price)
+                              .toFixed(2)
+                              .replace(".", ",")}
+                          </span>
+                        )}
+
+                        <div className="mt-1 text-3xl font-black">
+                          R$ {Number(product.price ?? 0)
+                            .toFixed(2)
+                            .replace(".", ",")}
+                        </div>
 
                       </div>
 
                     </div>
 
-                    {product.purchase_url ? (
+                  </a>
 
-                      <a
-                        href={product.purchase_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-6 block w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-bold text-black transition hover:bg-orange-400"
-                      >
-                        QUERO MEU PRODUTO
-                      </a>
+                  <div className="px-6 pb-6">
 
-                    ) : (
-
-                      <button
-                        disabled
-                        className="mt-6 w-full rounded-xl bg-white/10 px-5 py-4 font-bold text-gray-500"
-                      >
-                        LINK DE COMPRA EM BREVE
-                      </button>
-
-                    )}
+                    <a
+                      href={`/produto/${product.id}`}
+                      className="block w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-bold text-black transition hover:bg-orange-400"
+                    >
+                      VER PRODUTO
+                    </a>
 
                   </div>
 
