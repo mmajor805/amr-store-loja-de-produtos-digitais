@@ -27,7 +27,9 @@ export default function CheckoutPage() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     setError("");
@@ -38,7 +40,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!name.trim()) {
+    if (name.trim().length < 3) {
       setError("Digite seu nome completo.");
       return;
     }
@@ -78,6 +80,8 @@ export default function CheckoutPage() {
           body: JSON.stringify({
             external_id: externalId,
 
+            payment_method: "pix",
+
             amount: Math.round(
               cartTotal * 100
             ),
@@ -103,11 +107,18 @@ export default function CheckoutPage() {
       if (!response.ok) {
         throw new Error(
           result?.error ||
+            result?.detail ||
             "Não foi possível criar o pagamento."
         );
       }
 
-      if (!result?.data?.pix?.code) {
+      if (!result?.data) {
+        throw new Error(
+          "A Pixou Pay não retornou os dados da cobrança."
+        );
+      }
+
+      if (!result.data.pix?.code) {
         throw new Error(
           "A Pixou Pay não retornou o código Pix."
         );
@@ -116,14 +127,14 @@ export default function CheckoutPage() {
       setPix(result.data);
     } catch (err) {
       console.error(
-        "Erro ao criar pagamento:",
+        "Erro ao criar pagamento Pix:",
         err
       );
 
       setError(
         err instanceof Error
           ? err.message
-          : "Erro ao criar pagamento."
+          : "Erro ao criar pagamento Pix."
       );
     } finally {
       setLoading(false);
@@ -131,12 +142,12 @@ export default function CheckoutPage() {
   }
 
   async function copyPix() {
-    if (!pix?.pix?.code) return;
+    const code = pix?.pix?.code;
+
+    if (!code) return;
 
     try {
-      await navigator.clipboard.writeText(
-        pix.pix.code
-      );
+      await navigator.clipboard.writeText(code);
 
       setCopied(true);
 
@@ -145,9 +156,60 @@ export default function CheckoutPage() {
       }, 3000);
     } catch {
       setError(
-        "Não foi possível copiar automaticamente. Selecione o código manualmente."
+        "Não foi possível copiar automaticamente o código Pix."
       );
     }
+  }
+
+  if (cart.length === 0 && !pix) {
+    return (
+      <main className="min-h-screen bg-[#080808] text-white">
+
+        <header className="border-b border-white/10">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
+            <Link
+              href="/"
+              className="text-xl font-black"
+            >
+              AMR<span className="text-orange-500">.</span>STORE
+            </Link>
+
+            <Link
+              href="/"
+              className="text-sm text-gray-400 hover:text-white"
+            >
+              ← Voltar para a loja
+            </Link>
+          </div>
+        </header>
+
+        <section className="px-5 py-16">
+          <div className="mx-auto max-w-lg rounded-3xl border border-white/10 bg-white/[0.04] p-10 text-center">
+
+            <div className="text-5xl">
+              🛒
+            </div>
+
+            <h1 className="mt-5 text-2xl font-black">
+              Seu carrinho está vazio
+            </h1>
+
+            <p className="mt-3 text-gray-500">
+              Adicione um produto antes de finalizar sua compra.
+            </p>
+
+            <Link
+              href="/"
+              className="mt-7 inline-block rounded-xl bg-orange-500 px-7 py-4 font-black text-black"
+            >
+              VOLTAR PARA A LOJA
+            </Link>
+
+          </div>
+        </section>
+
+      </main>
+    );
   }
 
   return (
@@ -180,56 +242,9 @@ export default function CheckoutPage() {
 
         <div className="mx-auto max-w-5xl">
 
-          {/* TÍTULO */}
+          {/* PIX GERADO */}
 
-          <div className="mb-10">
-
-            <span className="text-sm font-bold uppercase tracking-widest text-orange-500">
-              Finalização
-            </span>
-
-            <h1 className="mt-3 text-4xl font-black sm:text-5xl">
-              Finalizar compra
-            </h1>
-
-            <p className="mt-3 text-gray-400">
-              Preencha seus dados e gere seu pagamento Pix.
-            </p>
-
-          </div>
-
-          {/* CARRINHO VAZIO */}
-
-          {cart.length === 0 && !pix && (
-
-            <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.02] p-12 text-center">
-
-              <div className="text-5xl">
-                🛒
-              </div>
-
-              <h2 className="mt-5 text-2xl font-bold">
-                Seu carrinho está vazio
-              </h2>
-
-              <p className="mt-3 text-gray-500">
-                Adicione um produto antes de finalizar a compra.
-              </p>
-
-              <Link
-                href="/"
-                className="mt-7 inline-block rounded-xl bg-orange-500 px-7 py-4 font-black text-black transition hover:bg-orange-400"
-              >
-                VOLTAR PARA A LOJA
-              </Link>
-
-            </div>
-
-          )}
-
-          {/* PAGAMENTO GERADO */}
-
-          {pix && (
+          {pix ? (
 
             <div className="mx-auto max-w-lg">
 
@@ -239,12 +254,12 @@ export default function CheckoutPage() {
                   ✓
                 </div>
 
-                <h2 className="mt-5 text-2xl font-black">
+                <h1 className="mt-5 text-3xl font-black">
                   Pix gerado!
-                </h2>
+                </h1>
 
-                <p className="mt-2 text-gray-400">
-                  Escaneie o QR Code ou copie o código Pix.
+                <p className="mt-3 text-gray-400">
+                  Faça o pagamento usando o QR Code abaixo.
                 </p>
 
                 {/* VALOR */}
@@ -252,14 +267,12 @@ export default function CheckoutPage() {
                 <div className="mt-6">
 
                   <p className="text-sm text-gray-500">
-                    Valor da compra
+                    Valor
                   </p>
 
                   <p className="mt-1 text-4xl font-black text-orange-500">
                     R${" "}
-                    {(
-                      pix.total_amount / 100
-                    )
+                    {(pix.total_amount / 100)
                       .toFixed(2)
                       .replace(".", ",")}
                   </p>
@@ -270,11 +283,11 @@ export default function CheckoutPage() {
 
                 {pix.pix?.qrcode_base64 && (
 
-                  <div className="mx-auto mt-7 flex w-fit rounded-2xl bg-white p-4">
+                  <div className="mx-auto mt-7 w-fit rounded-2xl bg-white p-4">
 
                     <img
                       src={`data:image/png;base64,${pix.pix.qrcode_base64}`}
-                      alt="QR Code Pix"
+                      alt="QR Code para pagamento Pix"
                       className="h-64 w-64"
                     />
 
@@ -282,7 +295,7 @@ export default function CheckoutPage() {
 
                 )}
 
-                {/* PIX COPIA E COLA */}
+                {/* COPIA E COLA */}
 
                 <div className="mt-7 text-left">
 
@@ -293,14 +306,13 @@ export default function CheckoutPage() {
                   <textarea
                     readOnly
                     value={pix.pix?.code || ""}
-                    className="h-28 w-full resize-none rounded-xl border border-white/10 bg-black/50 p-3 text-xs leading-5 text-gray-300 outline-none"
+                    className="h-28 w-full resize-none rounded-xl border border-white/10 bg-black/50 p-3 text-xs text-gray-300 outline-none"
                   />
 
                 </div>
 
-                {/* COPIAR */}
-
                 <button
+                  type="button"
                   onClick={copyPix}
                   className="mt-4 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400"
                 >
@@ -311,13 +323,12 @@ export default function CheckoutPage() {
 
                 <div className="mt-6 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-left">
 
-                  <p className="text-sm font-bold text-yellow-400">
-                    Importante
+                  <p className="font-bold text-yellow-400">
+                    Aguarde a confirmação
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-gray-500">
-                    Após realizar o pagamento, aguarde a confirmação.
-                    Não feche esta página imediatamente.
+                    Após o pagamento, aguarde a confirmação da transação.
                   </p>
 
                 </div>
@@ -326,226 +337,239 @@ export default function CheckoutPage() {
 
             </div>
 
-          )}
+          ) : (
 
-          {/* FORMULÁRIO */}
+            <>
+              {/* TÍTULO */}
 
-          {!pix && cart.length > 0 && (
+              <div className="mb-10">
 
-            <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
+                <span className="text-sm font-bold uppercase tracking-widest text-orange-500">
+                  Finalização
+                </span>
 
-              <form
-                onSubmit={handleSubmit}
-                className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 sm:p-8"
-              >
+                <h1 className="mt-3 text-4xl font-black sm:text-5xl">
+                  Finalizar compra
+                </h1>
 
-                <h2 className="text-2xl font-bold">
-                  Seus dados
-                </h2>
-
-                <p className="mt-2 text-sm text-gray-500">
-                  Esses dados serão associados ao seu pedido.
+                <p className="mt-3 text-gray-400">
+                  Preencha seus dados para gerar seu pagamento Pix.
                 </p>
 
-                {/* ERRO */}
+              </div>
 
-                {error && (
+              <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
 
-                  <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
-                    {error}
+                {/* FORMULÁRIO */}
+
+                <form
+                  onSubmit={handleSubmit}
+                  className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 sm:p-8"
+                >
+
+                  <h2 className="text-2xl font-bold">
+                    Seus dados
+                  </h2>
+
+                  <p className="mt-2 text-sm text-gray-500">
+                    Usaremos esses dados para identificar sua compra e processar o pedido.
+                  </p>
+
+                  {error && (
+
+                    <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+                      {error}
+                    </div>
+
+                  )}
+
+                  {/* NOME */}
+
+                  <div className="mt-7">
+
+                    <label
+                      htmlFor="name"
+                      className="mb-2 block text-sm font-bold"
+                    >
+                      Nome completo
+                    </label>
+
+                    <input
+                      id="name"
+                      type="text"
+                      value={name}
+                      onChange={(event) =>
+                        setName(event.target.value)
+                      }
+                      placeholder="Digite seu nome completo"
+                      required
+                      disabled={loading}
+                      className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
+                    />
+
                   </div>
 
-                )}
+                  {/* EMAIL */}
 
-                {/* NOME */}
+                  <div className="mt-5">
 
-                <div className="mt-7">
+                    <label
+                      htmlFor="email"
+                      className="mb-2 block text-sm font-bold"
+                    >
+                      E-mail
+                    </label>
 
-                  <label
-                    htmlFor="name"
-                    className="mb-2 block text-sm font-bold"
-                  >
-                    Nome completo
-                  </label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(event) =>
+                        setEmail(event.target.value)
+                      }
+                      placeholder="seuemail@email.com"
+                      required
+                      disabled={loading}
+                      className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
+                    />
 
-                  <input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(event) =>
-                      setName(event.target.value)
-                    }
-                    placeholder="Digite seu nome"
-                    required
-                    disabled={loading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
-                  />
+                  </div>
 
-                </div>
+                  {/* WHATSAPP */}
 
-                {/* EMAIL */}
+                  <div className="mt-5">
 
-                <div className="mt-5">
+                    <label
+                      htmlFor="whatsapp"
+                      className="mb-2 block text-sm font-bold"
+                    >
+                      WhatsApp
+                    </label>
 
-                  <label
-                    htmlFor="email"
-                    className="mb-2 block text-sm font-bold"
-                  >
-                    E-mail
-                  </label>
+                    <input
+                      id="whatsapp"
+                      type="tel"
+                      value={whatsapp}
+                      onChange={(event) =>
+                        setWhatsapp(event.target.value)
+                      }
+                      placeholder="(91) 99999-9999"
+                      required
+                      disabled={loading}
+                      className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
+                    />
 
-                  <input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(event) =>
-                      setEmail(event.target.value)
-                    }
-                    placeholder="seuemail@email.com"
-                    required
-                    disabled={loading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
-                  />
+                  </div>
 
-                </div>
+                  {/* SEGURANÇA */}
 
-                {/* WHATSAPP */}
+                  <div className="mt-7 rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
 
-                <div className="mt-5">
+                    <div className="flex gap-3">
 
-                  <label
-                    htmlFor="whatsapp"
-                    className="mb-2 block text-sm font-bold"
-                  >
-                    WhatsApp
-                  </label>
+                      <span className="text-xl">
+                        🔒
+                      </span>
 
-                  <input
-                    id="whatsapp"
-                    type="tel"
-                    value={whatsapp}
-                    onChange={(event) =>
-                      setWhatsapp(event.target.value)
-                    }
-                    placeholder="(91) 99999-9999"
-                    required
-                    disabled={loading}
-                    className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 text-white outline-none transition placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
-                  />
+                      <div>
 
-                </div>
+                        <p className="font-bold text-green-400">
+                          Seus dados estão seguros
+                        </p>
 
-                {/* SEGURANÇA */}
+                        <p className="mt-1 text-xs leading-5 text-gray-500">
+                          Seus dados serão utilizados somente para processar seu pedido.
+                        </p>
 
-                <div className="mt-7 rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
-
-                  <div className="flex gap-3">
-
-                    <span className="text-xl">
-                      🔒
-                    </span>
-
-                    <div>
-
-                      <p className="font-bold text-green-400">
-                        Pagamento seguro
-                      </p>
-
-                      <p className="mt-1 text-xs leading-5 text-gray-500">
-                        O pagamento Pix será processado pela Pixou Pay.
-                      </p>
+                      </div>
 
                     </div>
 
                   </div>
 
-                </div>
+                  {/* BOTÃO PIX */}
 
-                {/* BOTÃO */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="mt-7 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {loading
+                      ? "GERANDO PIX..."
+                      : "PAGAR AGORA"}
+                  </button>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="mt-7 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {loading
-                    ? "GERANDO PIX..."
-                    : "GERAR PAGAMENTO PIX"}
-                </button>
+                </form>
 
-              </form>
+                {/* RESUMO */}
 
-              {/* RESUMO */}
+                <aside className="h-fit rounded-3xl border border-white/10 bg-white/[0.04] p-6 lg:sticky lg:top-6">
 
-              <aside className="h-fit rounded-3xl border border-white/10 bg-white/[0.04] p-6 lg:sticky lg:top-6">
+                  <h2 className="text-xl font-bold">
+                    Resumo da compra
+                  </h2>
 
-                <h2 className="text-xl font-bold">
-                  Seu pedido
-                </h2>
+                  <div className="mt-6 space-y-4">
 
-                <div className="mt-6 space-y-4">
+                    {cart.map((product) => (
 
-                  {cart.map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex justify-between gap-4"
+                      >
 
-                    <div
-                      key={product.id}
-                      className="flex items-start justify-between gap-4"
-                    >
+                        <span className="text-sm leading-5 text-gray-300">
+                          {product.name}
+                        </span>
 
-                      <p className="min-w-0 font-medium leading-5">
-                        {product.name}
-                      </p>
+                        <span className="whitespace-nowrap font-bold">
+                          R${" "}
+                          {product.price
+                            .toFixed(2)
+                            .replace(".", ",")}
+                        </span>
 
-                      <span className="whitespace-nowrap font-bold">
+                      </div>
+
+                    ))}
+
+                  </div>
+
+                  <div className="mt-6 border-t border-white/10 pt-5">
+
+                    <div className="flex items-center justify-between">
+
+                      <span className="text-gray-400">
+                        Total
+                      </span>
+
+                      <span className="text-3xl font-black">
                         R${" "}
-                        {product.price
+                        {cartTotal
                           .toFixed(2)
                           .replace(".", ",")}
                       </span>
 
                     </div>
 
-                  ))}
-
-                </div>
-
-                <div className="mt-6 border-t border-white/10 pt-5">
-
-                  <div className="flex items-center justify-between">
-
-                    <span className="text-gray-400">
-                      Total
-                    </span>
-
-                    <span className="text-3xl font-black">
-                      R${" "}
-                      {cartTotal
-                        .toFixed(2)
-                        .replace(".", ",")}
-                    </span>
-
                   </div>
 
-                </div>
+                  <Link
+                    href="/carrinho"
+                    className="mt-5 block text-center text-sm text-gray-500 hover:text-white"
+                  >
+                    ← Voltar ao carrinho
+                  </Link>
 
-                <Link
-                  href="/carrinho"
-                  className="mt-5 block text-center text-sm text-gray-500 transition hover:text-white"
-                >
-                  ← Voltar ao carrinho
-                </Link>
+                </aside>
 
-              </aside>
-
-            </div>
-
+              </div>
+            </>
           )}
 
         </div>
 
       </section>
-
-      {/* FOOTER */}
 
       <footer className="border-t border-white/10 px-5 py-8 text-center text-sm text-gray-500">
         © 2026 AMR.STORE — Todos os direitos reservados.
