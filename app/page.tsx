@@ -30,6 +30,7 @@ const categories = [
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [loading, setLoading] = useState(true);
 
@@ -65,15 +66,29 @@ export default function Home() {
   }, []);
 
   const filteredProducts = useMemo(() => {
-    if (selectedCategory === "Todos") {
-      return products;
-    }
+    const searchText = search.trim().toLowerCase();
 
-    return products.filter(
-      (product) =>
-        (product.category || "Outros") === selectedCategory
-    );
-  }, [products, selectedCategory]);
+    return products.filter((product) => {
+      const matchesCategory =
+        selectedCategory === "Todos" ||
+        (product.category || "Outros") === selectedCategory;
+
+      const searchableText = [
+        product.name,
+        product.description,
+        product.category,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch =
+        searchText === "" ||
+        searchableText.includes(searchText);
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [products, search, selectedCategory]);
 
   return (
     <main className="min-h-screen bg-[#080808] text-white">
@@ -101,7 +116,7 @@ export default function Home() {
 
       {/* HERO */}
 
-      <section className="relative overflow-hidden px-5 pb-14 pt-16 sm:pb-20 sm:pt-20">
+      <section className="relative overflow-hidden px-5 pb-10 pt-14 sm:pb-14 sm:pt-20">
 
         <div className="pointer-events-none absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-orange-500/10 blur-3xl" />
 
@@ -119,9 +134,40 @@ export default function Home() {
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-gray-400 sm:text-lg">
-            Encontre produtos digitais, entretenimento, livros, ferramentas,
-            cursos e muito mais.
+            Encontre produtos digitais, entretenimento, livros,
+            ferramentas, cursos e muito mais.
           </p>
+
+          {/* BUSCA */}
+
+          <div className="mx-auto mt-8 max-w-2xl">
+
+            <div className="relative">
+
+              <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-xl">
+                🔎
+              </span>
+
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="O que você está procurando?"
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.06] py-5 pl-14 pr-5 text-white outline-none transition placeholder:text-gray-500 focus:border-orange-500/60 focus:bg-white/[0.08]"
+              />
+
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full px-3 py-1 text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
+
+            </div>
+
+          </div>
 
         </div>
 
@@ -187,16 +233,23 @@ export default function Home() {
             <div>
 
               <h2 className="text-2xl font-bold">
-                {selectedCategory === "Todos"
+
+                {search.trim()
+                  ? `Resultados para "${search}"`
+                  : selectedCategory === "Todos"
                   ? "Produtos em destaque"
                   : selectedCategory}
+
               </h2>
 
               <p className="mt-2 text-gray-400">
+
                 {filteredProducts.length}{" "}
+
                 {filteredProducts.length === 1
-                  ? "produto disponível"
-                  : "produtos disponíveis"}
+                  ? "produto encontrado"
+                  : "produtos encontrados"}
+
               </p>
 
             </div>
@@ -217,37 +270,49 @@ export default function Home() {
 
           )}
 
-          {/* SEM PRODUTOS */}
+          {/* SEM RESULTADOS */}
 
           {!loading &&
             filteredProducts.length === 0 && (
 
               <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center">
 
-                <div className="text-4xl">
-                  📦
+                <div className="text-5xl">
+                  🔎
                 </div>
 
-                <h3 className="mt-4 text-xl font-bold">
+                <h3 className="mt-5 text-xl font-bold">
                   Nenhum produto encontrado
                 </h3>
 
-                <p className="mt-2 text-gray-500">
-                  Ainda não temos produtos disponíveis nesta categoria.
+                <p className="mx-auto mt-2 max-w-md text-gray-500">
+                  Tente pesquisar por outro termo ou selecione
+                  outra categoria.
                 </p>
 
-                {selectedCategory !== "Todos" && (
+                <div className="mt-6 flex flex-wrap justify-center gap-3">
 
-                  <button
-                    onClick={() =>
-                      setSelectedCategory("Todos")
-                    }
-                    className="mt-6 rounded-xl bg-orange-500 px-5 py-3 font-bold text-black"
-                  >
-                    VER TODOS OS PRODUTOS
-                  </button>
+                  {search && (
+                    <button
+                      onClick={() => setSearch("")}
+                      className="rounded-xl bg-orange-500 px-5 py-3 font-bold text-black"
+                    >
+                      LIMPAR PESQUISA
+                    </button>
+                  )}
 
-                )}
+                  {selectedCategory !== "Todos" && (
+                    <button
+                      onClick={() =>
+                        setSelectedCategory("Todos")
+                      }
+                      className="rounded-xl border border-white/10 px-5 py-3 font-bold text-white"
+                    >
+                      VER TODOS
+                    </button>
+                  )}
+
+                </div>
 
               </div>
 
@@ -260,114 +325,149 @@ export default function Home() {
 
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 
-                {filteredProducts.map((product) => (
+                {filteredProducts.map((product) => {
 
-                  <article
-                    key={product.id}
-                    className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl transition duration-300 hover:-translate-y-1 hover:border-orange-500/40"
-                  >
+                  const price =
+                    Number(product.price ?? 0);
 
-                    {/* IMAGEM */}
+                  const oldPrice =
+                    product.old_price !== null
+                      ? Number(product.old_price)
+                      : null;
 
-                    <a
-                      href={`/produto/${product.id}`}
-                      className="block"
+                  const discount =
+                    oldPrice !== null &&
+                    oldPrice > price
+                      ? Math.round(
+                          ((oldPrice - price) /
+                            oldPrice) *
+                            100
+                        )
+                      : null;
+
+                  return (
+
+                    <article
+                      key={product.id}
+                      className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl transition duration-300 hover:-translate-y-1 hover:border-orange-500/40"
                     >
 
-                      {product.image_url ? (
+                      {/* IMAGEM */}
 
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="h-52 w-full object-cover transition duration-500 group-hover:scale-105"
-                        />
+                      <a
+                        href={`/produto/${product.id}`}
+                        className="block overflow-hidden"
+                      >
 
-                      ) : (
+                        {product.image_url ? (
 
-                        <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="h-52 w-full object-cover transition duration-500 group-hover:scale-105"
+                          />
 
-                          <div className="text-center">
+                        ) : (
 
-                            <div className="text-5xl font-black">
-                              AMR
-                            </div>
+                          <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
 
-                            <div className="mt-2 text-xs uppercase tracking-[0.25em] text-orange-400">
-                              {product.category || "Produto Digital"}
+                            <div className="text-center">
+
+                              <div className="text-5xl font-black">
+                                AMR
+                              </div>
+
+                              <div className="mt-2 text-xs uppercase tracking-[0.25em] text-orange-400">
+                                {product.category ||
+                                  "Produto Digital"}
+                              </div>
+
                             </div>
 
                           </div>
 
-                        </div>
+                        )}
 
-                      )}
-
-                    </a>
-
-                    {/* INFORMAÇÕES */}
-
-                    <div className="p-6">
-
-                      <div className="flex items-center justify-between gap-3">
-
-                        <span className="rounded-full bg-orange-500/10 px-3 py-1 text-xs font-bold text-orange-400">
-                          {product.category || "Outros"}
-                        </span>
-
-                      </div>
-
-                      <h3 className="mt-5 text-xl font-bold">
-                        {product.name}
-                      </h3>
-
-                      {product.description && (
-
-                        <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-400">
-                          {product.description}
-                        </p>
-
-                      )}
-
-                      {/* PREÇO */}
-
-                      <div className="mt-6">
-
-                        {product.old_price !== null &&
-                          Number(product.old_price) >
-                            Number(product.price ?? 0) && (
-
-                            <div className="text-sm text-gray-500 line-through">
-                              R${" "}
-                              {Number(product.old_price)
-                                .toFixed(2)
-                                .replace(".", ",")}
-                            </div>
-
-                          )}
-
-                        <div className="mt-1 text-3xl font-black">
-                          R${" "}
-                          {Number(product.price ?? 0)
-                            .toFixed(2)
-                            .replace(".", ",")}
-                        </div>
-
-                      </div>
-
-                      {/* BOTÃO */}
-
-                      <a
-                        href={`/produto/${product.id}`}
-                        className="mt-6 block w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-black text-black transition hover:bg-orange-400"
-                      >
-                        VER PRODUTO
                       </a>
 
-                    </div>
+                      {/* INFORMAÇÕES */}
 
-                  </article>
+                      <div className="p-6">
 
-                ))}
+                        <div className="flex items-center justify-between gap-3">
+
+                          <span className="rounded-full bg-orange-500/10 px-3 py-1 text-xs font-bold text-orange-400">
+                            {product.category ||
+                              "Outros"}
+                          </span>
+
+                          {discount !== null && (
+                            <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-bold text-green-400">
+                              -{discount}%
+                            </span>
+                          )}
+
+                        </div>
+
+                        <h3 className="mt-5 text-xl font-bold">
+                          {product.name}
+                        </h3>
+
+                        {product.description && (
+
+                          <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-400">
+                            {product.description}
+                          </p>
+
+                        )}
+
+                        {/* PREÇO */}
+
+                        <div className="mt-6">
+
+                          {oldPrice !== null &&
+                            oldPrice > price && (
+
+                              <div className="text-sm text-gray-500 line-through">
+                                R${" "}
+                                {oldPrice
+                                  .toFixed(2)
+                                  .replace(
+                                    ".",
+                                    ","
+                                  )}
+                              </div>
+
+                            )}
+
+                          <div className="mt-1 text-3xl font-black">
+                            R${" "}
+                            {price
+                              .toFixed(2)
+                              .replace(
+                                ".",
+                                ","
+                              )}
+                          </div>
+
+                        </div>
+
+                        {/* BOTÃO */}
+
+                        <a
+                          href={`/produto/${product.id}`}
+                          className="mt-6 block w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-black text-black transition hover:bg-orange-400"
+                        >
+                          VER PRODUTO
+                        </a>
+
+                      </div>
+
+                    </article>
+
+                  );
+
+                })}
 
               </div>
 
@@ -442,9 +542,7 @@ export default function Home() {
       {/* FOOTER */}
 
       <footer className="border-t border-white/10 px-5 py-8 text-center text-sm text-gray-500">
-
         © 2026 AMR.STORE — Todos os direitos reservados.
-
       </footer>
 
     </main>
