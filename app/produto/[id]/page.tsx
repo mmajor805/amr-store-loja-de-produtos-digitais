@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, Link } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "../../../utils/supabase/client";
 
 type Product = {
   id: number;
@@ -25,29 +25,23 @@ export default function ProductPage() {
 
   useEffect(() => {
     async function loadProduct() {
-      try {
-        const supabase = createClient();
+      const supabase = createClient();
 
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .eq("id", id)
-          .eq("active", true)
-          .single();
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .eq("active", true)
+        .single();
 
-        if (error) {
-          console.error(error);
-          setError("Produto não encontrado.");
-          return;
-        }
-
+      if (error) {
+        console.error(error);
+        setError("Produto não encontrado.");
+      } else {
         setProduct(data);
-      } catch (err) {
-        console.error(err);
-        setError("Erro ao carregar o produto.");
-      } finally {
-        setLoading(false);
       }
+
+      setLoading(false);
     }
 
     if (id) {
@@ -58,9 +52,7 @@ export default function ProductPage() {
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#080808] text-white">
-        <p className="text-gray-400">
-          Carregando produto...
-        </p>
+        <p className="text-gray-400">Carregando produto...</p>
       </main>
     );
   }
@@ -69,7 +61,6 @@ export default function ProductPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#080808] px-5 text-white">
         <div className="text-center">
-
           <h1 className="text-3xl font-black">
             Produto não encontrado
           </h1>
@@ -84,7 +75,6 @@ export default function ProductPage() {
           >
             VOLTAR PARA A LOJA
           </Link>
-
         </div>
       </main>
     );
@@ -105,7 +95,7 @@ export default function ProductPage() {
 
           <Link
             href="/"
-            className="text-sm text-gray-400 transition hover:text-white"
+            className="text-sm text-gray-400"
           >
             ← Voltar para a loja
           </Link>
@@ -120,19 +110,14 @@ export default function ProductPage() {
           <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04]">
 
             {product.image_url ? (
-
               <img
                 src={product.image_url}
                 alt={product.name}
                 className="h-[350px] w-full object-cover sm:h-[500px]"
               />
-
             ) : (
-
               <div className="flex h-[350px] items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black sm:h-[500px]">
-
                 <div className="text-center">
-
                   <div className="text-6xl font-black">
                     AMR
                   </div>
@@ -140,11 +125,8 @@ export default function ProductPage() {
                   <div className="mt-2 text-sm uppercase tracking-[0.3em] text-orange-400">
                     Produto Digital
                   </div>
-
                 </div>
-
               </div>
-
             )}
 
           </div>
@@ -184,7 +166,6 @@ export default function ProductPage() {
             </div>
 
             {product.purchase_url ? (
-
               <a
                 href={product.purchase_url}
                 target="_blank"
@@ -193,16 +174,10 @@ export default function ProductPage() {
               >
                 QUERO COMPRAR AGORA
               </a>
-
             ) : (
-
-              <button
-                disabled
-                className="mt-8 w-full cursor-not-allowed rounded-2xl bg-white/10 px-6 py-5 text-lg font-black text-gray-500"
-              >
-                COMPRA EM BREVE
-              </button>
-
+              <div className="mt-8 rounded-2xl bg-white/10 px-6 py-5 text-center font-bold text-gray-500">
+                Link de compra não configurado
+              </div>
             )}
 
             <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
