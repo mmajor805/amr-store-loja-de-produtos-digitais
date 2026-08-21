@@ -8,7 +8,7 @@ type Product = {
   id: number;
   name: string;
   description: string | null;
-  price: number;
+  price: number | null;
   old_price: number | null;
   image_url: string | null;
   purchase_url: string | null;
@@ -17,12 +17,12 @@ type Product = {
 };
 
 const categories = [
-  "Redes Sociais",
   "Streaming",
   "Filmes",
   "Livros",
   "Design",
   "Cursos",
+  "Redes Sociais",
   "Música",
   "Packs Digitais",
   "Outros",
@@ -44,6 +44,8 @@ export default function AdminPage() {
   const [purchaseUrl, setPurchaseUrl] = useState("");
   const [category, setCategory] = useState("Outros");
 
+  const [editingId, setEditingId] = useState<number | null>(null);
+
   async function loadProducts() {
     const {
       data: { user },
@@ -57,7 +59,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from("products")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("id", { ascending: false });
 
     if (error) {
       console.error(error);
@@ -73,7 +75,40 @@ export default function AdminPage() {
     loadProducts();
   }, []);
 
-  async function addProduct(event: FormEvent<HTMLFormElement>) {
+  function clearForm() {
+    setName("");
+    setDescription("");
+    setPrice("");
+    setOldPrice("");
+    setImageUrl("");
+    setPurchaseUrl("");
+    setCategory("Outros");
+    setEditingId(null);
+  }
+
+  function editProduct(product: Product) {
+    setEditingId(product.id);
+    setName(product.name || "");
+    setDescription(product.description || "");
+    setPrice(
+      product.price !== null ? String(product.price) : ""
+    );
+    setOldPrice(
+      product.old_price !== null
+        ? String(product.old_price)
+        : ""
+    );
+    setImageUrl(product.image_url || "");
+    setPurchaseUrl(product.purchase_url || "");
+    setCategory(product.category || "Outros");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!name.trim()) {
@@ -88,7 +123,7 @@ export default function AdminPage() {
 
     setSaving(true);
 
-    const { error } = await supabase.from("products").insert({
+    const productData = {
       name: name.trim(),
       description: description.trim() || null,
       price: Number(price),
@@ -96,28 +131,50 @@ export default function AdminPage() {
       image_url: imageUrl.trim() || null,
       purchase_url: purchaseUrl.trim() || null,
       category,
-      active: true,
-    });
+    };
+
+    let error;
+
+    if (editingId !== null) {
+      const result = await supabase
+        .from("products")
+        .update(productData)
+        .eq("id", editingId);
+
+      error = result.error;
+    } else {
+      const result = await supabase
+        .from("products")
+        .insert({
+          ...productData,
+          active: true,
+        });
+
+      error = result.error;
+    }
 
     if (error) {
-      alert("Erro ao adicionar produto: " + error.message);
+      alert(
+        editingId !== null
+          ? "Erro ao editar produto: " + error.message
+          : "Erro ao adicionar produto: " + error.message
+      );
+
       setSaving(false);
       return;
     }
 
-    setName("");
-    setDescription("");
-    setPrice("");
-    setOldPrice("");
-    setImageUrl("");
-    setPurchaseUrl("");
-    setCategory("Outros");
+    alert(
+      editingId !== null
+        ? "Produto atualizado com sucesso!"
+        : "Produto adicionado com sucesso!"
+    );
+
+    clearForm();
 
     await loadProducts();
 
     setSaving(false);
-
-    alert("Produto adicionado com sucesso!");
   }
 
   async function toggleProduct(product: Product) {
@@ -173,20 +230,42 @@ export default function AdminPage() {
 
         </header>
 
-        {/* CADASTRO */}
+        {/* FORMULÁRIO */}
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
 
-          <h2 className="text-2xl font-bold">
-            Adicionar produto
-          </h2>
+          <div className="flex items-center justify-between gap-4">
 
-          <p className="mt-2 text-sm text-gray-400">
-            Cadastre produtos digitais de diferentes categorias.
-          </p>
+            <div>
+
+              <h2 className="text-2xl font-bold">
+                {editingId !== null
+                  ? "Editar produto"
+                  : "Adicionar produto"}
+              </h2>
+
+              <p className="mt-2 text-sm text-gray-400">
+                {editingId !== null
+                  ? "Altere as informações do produto."
+                  : "Cadastre novos produtos digitais."}
+              </p>
+
+            </div>
+
+            {editingId !== null && (
+              <button
+                type="button"
+                onClick={clearForm}
+                className="rounded-xl border border-white/10 px-4 py-2 text-sm text-gray-300 hover:bg-white/10"
+              >
+                Cancelar
+              </button>
+            )}
+
+          </div>
 
           <form
-            onSubmit={addProduct}
+            onSubmit={saveProduct}
             className="mt-6 grid gap-4"
           >
 
@@ -247,7 +326,7 @@ export default function AdminPage() {
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descreva o produto"
+                placeholder="Descrição do produto"
                 rows={4}
                 className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 outline-none focus:border-orange-500"
               />
@@ -315,7 +394,7 @@ export default function AdminPage() {
 
             </div>
 
-            {/* COMPRA */}
+            {/* LINK DE COMPRA */}
 
             <div>
 
@@ -342,6 +421,8 @@ export default function AdminPage() {
             >
               {saving
                 ? "Salvando..."
+                : editingId !== null
+                ? "SALVAR ALTERAÇÕES"
                 : "+ ADICIONAR PRODUTO"}
             </button>
 
@@ -349,7 +430,7 @@ export default function AdminPage() {
 
         </section>
 
-        {/* PRODUTOS */}
+        {/* LISTA */}
 
         <section className="mt-8">
 
@@ -382,9 +463,9 @@ export default function AdminPage() {
 
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-                    <div>
+                    <div className="min-w-0">
 
-                      <h3 className="font-bold">
+                      <h3 className="truncate font-bold">
                         {product.name}
                       </h3>
 
@@ -395,23 +476,55 @@ export default function AdminPage() {
                         </span>
 
                         <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-gray-400">
-                          R$ {Number(product.price).toFixed(2).replace(".", ",")}
+                          R${" "}
+                          {Number(product.price ?? 0)
+                            .toFixed(2)
+                            .replace(".", ",")}
+                        </span>
+
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs ${
+                            product.active
+                              ? "bg-green-500/10 text-green-400"
+                              : "bg-red-500/10 text-red-400"
+                          }`}
+                        >
+                          {product.active
+                            ? "Ativo"
+                            : "Inativo"}
                         </span>
 
                       </div>
 
                     </div>
 
-                    <button
-                      onClick={() => toggleProduct(product)}
-                      className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
-                        product.active
-                          ? "bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:text-red-400"
-                          : "bg-red-500/10 text-red-400 hover:bg-green-500/10 hover:text-green-400"
-                      }`}
-                    >
-                      {product.active ? "Ativo" : "Inativo"}
-                    </button>
+                    <div className="flex gap-2">
+
+                      <button
+                        onClick={() =>
+                          editProduct(product)
+                        }
+                        className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold transition hover:bg-white/10"
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          toggleProduct(product)
+                        }
+                        className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                          product.active
+                            ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                            : "bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                        }`}
+                      >
+                        {product.active
+                          ? "Desativar"
+                          : "Ativar"}
+                      </button>
+
+                    </div>
 
                   </div>
 
