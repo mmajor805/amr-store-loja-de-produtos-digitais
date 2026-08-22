@@ -79,7 +79,6 @@ export default function CheckoutPage() {
           },
           body: JSON.stringify({
             external_id: externalId,
-
             payment_method: "pix",
 
             amount: Math.round(
@@ -161,12 +160,64 @@ export default function CheckoutPage() {
     }
   }
 
+  /*
+   * PREPARA O QR CODE
+   *
+   * A Pixou pode retornar:
+   * 1. Base64 puro
+   * 2. Data URI
+   * 3. URL
+   *
+   * Esta função trata os três formatos.
+   */
+  function getQrCodeSource(
+    value?: string
+  ): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const cleanValue = value.trim();
+
+    if (!cleanValue) {
+      return null;
+    }
+
+    // Se já for uma URL ou Data URI
+    if (
+      cleanValue.startsWith("data:image/") ||
+      cleanValue.startsWith("http://") ||
+      cleanValue.startsWith("https://")
+    ) {
+      return cleanValue;
+    }
+
+    // Remove espaços e quebras de linha do Base64
+    const base64 = cleanValue.replace(/\s/g, "");
+
+    // Detecta SVG em Base64
+    if (
+      base64.startsWith("PHN2Zy") ||
+      base64.startsWith("PD94bWwg")
+    ) {
+      return `data:image/svg+xml;base64,${base64}`;
+    }
+
+    // Por padrão, trata como PNG Base64
+    return `data:image/png;base64,${base64}`;
+  }
+
+  const qrCodeSource = getQrCodeSource(
+    pix?.pix?.qrcode_base64
+  );
+
   if (cart.length === 0 && !pix) {
     return (
       <main className="min-h-screen bg-[#080808] text-white">
 
         <header className="border-b border-white/10">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
+
             <Link
               href="/"
               className="text-xl font-black"
@@ -176,14 +227,16 @@ export default function CheckoutPage() {
 
             <Link
               href="/"
-              className="text-sm text-gray-400 hover:text-white"
+              className="text-sm text-gray-400 transition hover:text-white"
             >
               ← Voltar para a loja
             </Link>
+
           </div>
         </header>
 
         <section className="px-5 py-16">
+
           <div className="mx-auto max-w-lg rounded-3xl border border-white/10 bg-white/[0.04] p-10 text-center">
 
             <div className="text-5xl">
@@ -200,12 +253,13 @@ export default function CheckoutPage() {
 
             <Link
               href="/"
-              className="mt-7 inline-block rounded-xl bg-orange-500 px-7 py-4 font-black text-black"
+              className="mt-7 inline-block rounded-xl bg-orange-500 px-7 py-4 font-black text-black transition hover:bg-orange-400"
             >
               VOLTAR PARA A LOJA
             </Link>
 
           </div>
+
         </section>
 
       </main>
@@ -250,7 +304,9 @@ export default function CheckoutPage() {
 
               <div className="rounded-3xl border border-green-500/20 bg-white/[0.04] p-6 text-center sm:p-8">
 
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 text-3xl">
+                {/* ÍCONE DE SUCESSO */}
+
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 text-3xl text-green-400">
                   ✓
                 </div>
 
@@ -281,21 +337,40 @@ export default function CheckoutPage() {
 
                 {/* QR CODE */}
 
-                {pix.pix?.qrcode_base64 && (
+                {qrCodeSource ? (
 
-                  <div className="mx-auto mt-7 w-fit rounded-2xl bg-white p-4">
+                  <div className="mx-auto mt-7 flex w-fit items-center justify-center rounded-2xl bg-white p-5">
 
                     <img
-                      src={`data:image/png;base64,${pix.pix.qrcode_base64}`}
+                      src={qrCodeSource}
                       alt="QR Code para pagamento Pix"
-                      className="h-64 w-64"
+                      className="h-64 w-64 object-contain"
+                      onError={(event) => {
+                        console.error(
+                          "Não foi possível carregar o QR Code Pix."
+                        );
+
+                        event.currentTarget.style.display =
+                          "none";
+                      }}
                     />
+
+                  </div>
+
+                ) : (
+
+                  <div className="mx-auto mt-7 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5">
+
+                    <p className="text-sm text-yellow-400">
+                      O QR Code não foi disponibilizado pela
+                      operadora. Utilize o Pix Copia e Cola abaixo.
+                    </p>
 
                   </div>
 
                 )}
 
-                {/* COPIA E COLA */}
+                {/* PIX COPIA E COLA */}
 
                 <div className="mt-7 text-left">
 
@@ -306,10 +381,12 @@ export default function CheckoutPage() {
                   <textarea
                     readOnly
                     value={pix.pix?.code || ""}
-                    className="h-28 w-full resize-none rounded-xl border border-white/10 bg-black/50 p-3 text-xs text-gray-300 outline-none"
+                    className="h-32 w-full resize-none rounded-xl border border-white/10 bg-black/50 p-3 text-xs leading-5 text-gray-300 outline-none focus:border-orange-500"
                   />
 
                 </div>
+
+                {/* BOTÃO COPIAR */}
 
                 <button
                   type="button"
@@ -321,6 +398,8 @@ export default function CheckoutPage() {
                     : "COPIAR PIX"}
                 </button>
 
+                {/* AVISO */}
+
                 <div className="mt-6 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-left">
 
                   <p className="font-bold text-yellow-400">
@@ -328,7 +407,8 @@ export default function CheckoutPage() {
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-gray-500">
-                    Após o pagamento, aguarde a confirmação da transação.
+                    Após realizar o pagamento, aguarde a
+                    confirmação da transação.
                   </p>
 
                 </div>
@@ -372,8 +452,11 @@ export default function CheckoutPage() {
                   </h2>
 
                   <p className="mt-2 text-sm text-gray-500">
-                    Usaremos esses dados para identificar sua compra e processar o pedido.
+                    Usaremos esses dados para identificar sua
+                    compra e processar o pedido.
                   </p>
+
+                  {/* ERRO */}
 
                   {error && (
 
@@ -478,7 +561,8 @@ export default function CheckoutPage() {
                         </p>
 
                         <p className="mt-1 text-xs leading-5 text-gray-500">
-                          Seus dados serão utilizados somente para processar seu pedido.
+                          Seus dados serão utilizados somente
+                          para processar seu pedido.
                         </p>
 
                       </div>
@@ -487,7 +571,7 @@ export default function CheckoutPage() {
 
                   </div>
 
-                  {/* BOTÃO PIX */}
+                  {/* BOTÃO PAGAR */}
 
                   <button
                     type="submit"
@@ -556,7 +640,7 @@ export default function CheckoutPage() {
 
                   <Link
                     href="/carrinho"
-                    className="mt-5 block text-center text-sm text-gray-500 hover:text-white"
+                    className="mt-5 block text-center text-sm text-gray-500 transition hover:text-white"
                   >
                     ← Voltar ao carrinho
                   </Link>
@@ -564,12 +648,16 @@ export default function CheckoutPage() {
                 </aside>
 
               </div>
+
             </>
+
           )}
 
         </div>
 
       </section>
+
+      {/* FOOTER */}
 
       <footer className="border-t border-white/10 px-5 py-8 text-center text-sm text-gray-500">
         © 2026 AMR.STORE — Todos os direitos reservados.
