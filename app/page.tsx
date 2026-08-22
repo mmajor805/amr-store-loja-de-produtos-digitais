@@ -35,6 +35,11 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [loading, setLoading] = useState(true);
 
+  const [showCartNotification, setShowCartNotification] =
+    useState(false);
+  const [addedProductName, setAddedProductName] =
+    useState("");
+
   const { addToCart, cartCount } = useCart();
 
   useEffect(() => {
@@ -101,11 +106,67 @@ export default function Home() {
       image_url: product.image_url,
     });
 
-    alert("Produto adicionado ao carrinho!");
+    setAddedProductName(product.name);
+    setShowCartNotification(true);
+
+    setTimeout(() => {
+      setShowCartNotification(false);
+    }, 3000);
   }
 
   return (
     <main className="min-h-screen bg-[#080808] text-white">
+
+      {/* NOTIFICAÇÃO DO CARRINHO */}
+
+      {showCartNotification && (
+        <div className="fixed bottom-5 left-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 animate-[slideUp_0.3s_ease-out] sm:bottom-6 sm:left-auto sm:right-6 sm:w-auto sm:max-w-sm sm:translate-x-0">
+
+          <div className="overflow-hidden rounded-2xl border border-orange-500/30 bg-[#111111]/95 shadow-2xl shadow-black/50 backdrop-blur-xl">
+
+            <div className="flex items-center gap-4 p-4">
+
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-xl shadow-lg shadow-orange-500/20">
+                🛒
+              </div>
+
+              <div className="min-w-0 flex-1">
+
+                <div className="flex items-center gap-2">
+
+                  <span className="text-sm font-black text-white">
+                    Adicionado ao carrinho
+                  </span>
+
+                  <span className="text-green-400">
+                    ✓
+                  </span>
+
+                </div>
+
+                <p className="mt-1 truncate text-xs text-gray-400">
+                  {addedProductName}
+                </p>
+
+              </div>
+
+              <a
+                href="/carrinho"
+                className="shrink-0 rounded-lg bg-orange-500 px-3 py-2 text-xs font-black text-black transition hover:bg-orange-400"
+              >
+                Ver carrinho
+              </a>
+
+            </div>
+
+            <div className="h-0.5 w-full bg-orange-500/20">
+              <div className="h-full w-full origin-left animate-[progress_3s_linear] bg-orange-500" />
+            </div>
+
+          </div>
+
+        </div>
+      )}
 
       {/* HEADER */}
 
@@ -558,6 +619,28 @@ export default function Home() {
       <footer className="border-t border-white/10 px-5 py-8 text-center text-sm text-gray-500">
         © 2026 AMR.STORE — Todos os direitos reservados.
       </footer>
+
+      <style jsx global>{`
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes progress {
+          from {
+            transform: scaleX(1);
+          }
+          to {
+            transform: scaleX(0);
+          }
+        }
+      `}</style>
 
     </main>
   );
