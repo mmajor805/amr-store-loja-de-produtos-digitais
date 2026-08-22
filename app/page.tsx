@@ -350,7 +350,7 @@ export default function Home() {
 
                     <article
                       key={product.id}
-                      className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] shadow-2xl transition duration-300 hover:-translate-y-1 hover:border-orange-500/40"
+                      className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-2xl transition duration-300 hover:-translate-y-1 hover:border-orange-500/40 sm:rounded-3xl"
                     >
 
                       {/* IMAGEM */}
@@ -365,20 +365,20 @@ export default function Home() {
                           <img
                             src={product.image_url}
                             alt={product.name}
-                            className="h-52 w-full object-cover transition duration-500 group-hover:scale-105"
+                            className="h-32 w-full object-cover transition duration-500 group-hover:scale-105 sm:h-52"
                           />
 
                         ) : (
 
-                          <div className="flex h-52 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black">
+                          <div className="flex h-32 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black sm:h-52">
 
                             <div className="text-center">
 
-                              <div className="text-5xl font-black">
+                              <div className="text-3xl font-black sm:text-5xl">
                                 AMR
                               </div>
 
-                              <div className="mt-2 text-xs uppercase tracking-[0.25em] text-orange-400">
+                              <div className="mt-1 text-[8px] uppercase tracking-[0.18em] text-orange-400 sm:mt-2 sm:text-xs sm:tracking-[0.25em]">
                                 {product.category ||
                                   "Produto Digital"}
                               </div>
@@ -393,30 +393,30 @@ export default function Home() {
 
                       {/* INFORMAÇÕES */}
 
-                      <div className="p-6">
+                      <div className="p-3 sm:p-6">
 
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-1">
 
-                          <span className="rounded-full bg-orange-500/10 px-3 py-1 text-xs font-bold text-orange-400">
+                          <span className="max-w-[75%] truncate rounded-full bg-orange-500/10 px-2 py-1 text-[9px] font-bold text-orange-400 sm:px-3 sm:text-xs">
                             {product.category ||
                               "Outros"}
                           </span>
 
                           {discount !== null && (
-                            <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-bold text-green-400">
+                            <span className="rounded-full bg-green-500/10 px-2 py-1 text-[9px] font-bold text-green-400 sm:px-3 sm:text-xs">
                               -{discount}%
                             </span>
                           )}
 
                         </div>
 
-                        <h3 className="mt-5 text-xl font-bold">
+                        <h3 className="mt-3 line-clamp-2 text-sm font-bold sm:mt-5 sm:text-xl">
                           {product.name}
                         </h3>
 
                         {product.description && (
 
-                          <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-400">
+                          <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-gray-400 sm:mt-3 sm:line-clamp-3 sm:text-sm sm:leading-6">
                             {product.description}
                           </p>
 
@@ -424,12 +424,12 @@ export default function Home() {
 
                         {/* PREÇO */}
 
-                        <div className="mt-6">
+                        <div className="mt-3 sm:mt-6">
 
                           {oldPrice !== null &&
                             oldPrice > price && (
 
-                              <div className="text-sm text-gray-500 line-through">
+                              <div className="text-[10px] text-gray-500 line-through sm:text-sm">
                                 R${" "}
                                 {oldPrice
                                   .toFixed(2)
@@ -441,7 +441,7 @@ export default function Home() {
 
                             )}
 
-                          <div className="mt-1 text-3xl font-black">
+                          <div className="mt-1 text-xl font-black sm:text-3xl">
                             R${" "}
                             {price
                               .toFixed(2)
@@ -455,20 +455,20 @@ export default function Home() {
 
                         {/* BOTÕES */}
 
-                        <div className="mt-6 grid gap-3">
+                        <div className="mt-3 grid gap-2 sm:mt-6 sm:gap-3">
 
                           <button
                             onClick={() =>
                               handleAddToCart(product)
                             }
-                            className="w-full rounded-xl border border-orange-500 bg-orange-500/10 px-5 py-4 font-black text-orange-400 transition hover:bg-orange-500 hover:text-black"
+                            className="w-full rounded-lg border border-orange-500 bg-orange-500/10 px-2 py-2.5 text-[9px] font-black leading-tight text-orange-400 transition hover:bg-orange-500 hover:text-black sm:rounded-xl sm:px-5 sm:py-4 sm:text-base"
                           >
                             🛒 ADICIONAR AO CARRINHO
                           </button>
 
                           <a
                             href={`/produto/${product.id}`}
-                            className="w-full rounded-xl bg-orange-500 px-5 py-4 text-center font-black text-black transition hover:bg-orange-400"
+                            className="w-full rounded-lg bg-orange-500 px-2 py-2.5 text-center text-[9px] font-black leading-tight text-black transition hover:bg-orange-400 sm:rounded-xl sm:px-5 sm:py-4 sm:text-base"
                           >
                             VER PRODUTO
                           </a>
