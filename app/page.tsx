@@ -29,14 +29,19 @@ const categories = [
   "Outros",
 ];
 
+const PRODUCTS_PER_SECTION = 4;
+
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [loading, setLoading] = useState(true);
 
-  const [showCartNotification, setShowCartNotification] = useState(false);
-  const [addedProductName, setAddedProductName] = useState("");
+  const [showCartNotification, setShowCartNotification] =
+    useState(false);
+
+  const [addedProductName, setAddedProductName] =
+    useState("");
 
   const { addToCart, cartCount } = useCart();
 
@@ -54,14 +59,22 @@ export default function Home() {
           .order("id", { ascending: false });
 
         if (error) {
-          console.error("Erro ao carregar produtos:", error);
+          console.error(
+            "Erro ao carregar produtos:",
+            error
+          );
+
           setProducts([]);
           return;
         }
 
         setProducts(data || []);
       } catch (error) {
-        console.error("Erro inesperado:", error);
+        console.error(
+          "Erro inesperado:",
+          error
+        );
+
         setProducts([]);
       } finally {
         setLoading(false);
@@ -71,14 +84,14 @@ export default function Home() {
     loadProducts();
   }, []);
 
-  const filteredProducts = useMemo(() => {
+  const searchResults = useMemo(() => {
     const searchText = search.trim().toLowerCase();
 
-    return products.filter((product) => {
-      const matchesCategory =
-        selectedCategory === "Todos" ||
-        (product.category || "Outros") === selectedCategory;
+    if (!searchText) {
+      return [];
+    }
 
+    return products.filter((product) => {
       const searchableText = [
         product.name,
         product.description,
@@ -88,13 +101,33 @@ export default function Home() {
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch =
-        searchText === "" ||
-        searchableText.includes(searchText);
-
-      return matchesCategory && matchesSearch;
+      return searchableText.includes(searchText);
     });
-  }, [products, search, selectedCategory]);
+  }, [products, search]);
+
+  const selectedCategoryProducts = useMemo(() => {
+    if (selectedCategory === "Todos") {
+      return products;
+    }
+
+    return products.filter(
+      (product) =>
+        (product.category || "Outros") ===
+        selectedCategory
+    );
+  }, [products, selectedCategory]);
+
+  const recentProducts = useMemo(() => {
+    return products.slice(0, PRODUCTS_PER_SECTION);
+  }, [products]);
+
+  function getCategoryProducts(category: string) {
+    return products.filter(
+      (product) =>
+        (product.category || "Outros") ===
+        category
+    );
+  }
 
   function handleAddToCart(product: Product) {
     addToCart({
@@ -112,6 +145,138 @@ export default function Home() {
     }, 3500);
   }
 
+  function handleSelectCategory(category: string) {
+    setSelectedCategory(category);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  function ProductCard({
+    product,
+  }: {
+    product: Product;
+  }) {
+    const price = Number(product.price ?? 0);
+
+    const oldPrice =
+      product.old_price !== null
+        ? Number(product.old_price)
+        : null;
+
+    const discount =
+      oldPrice !== null &&
+      oldPrice > price
+        ? Math.round(
+            ((oldPrice - price) / oldPrice) * 100
+          )
+        : null;
+
+    return (
+      <article
+        key={product.id}
+        className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-2xl transition duration-300 hover:-translate-y-1 hover:border-orange-500/40 sm:rounded-3xl"
+      >
+        {/* IMAGEM */}
+
+        <a
+          href={`/produto/${product.id}`}
+          className="block overflow-hidden"
+        >
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="h-32 w-full object-cover transition duration-500 group-hover:scale-105 sm:h-52"
+            />
+          ) : (
+            <div className="flex h-32 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black sm:h-52">
+              <div className="text-center">
+                <div className="text-3xl font-black sm:text-5xl">
+                  AMR
+                </div>
+
+                <div className="mt-1 text-[8px] uppercase tracking-[0.18em] text-orange-400 sm:mt-2 sm:text-xs sm:tracking-[0.25em]">
+                  {product.category ||
+                    "Produto Digital"}
+                </div>
+              </div>
+            </div>
+          )}
+        </a>
+
+        {/* INFORMAÇÕES */}
+
+        <div className="p-3 sm:p-6">
+          <div className="flex items-center justify-between gap-1">
+            <span className="max-w-[75%] truncate rounded-full bg-orange-500/10 px-2 py-1 text-[9px] font-bold text-orange-400 sm:px-3 sm:text-xs">
+              {product.category || "Outros"}
+            </span>
+
+            {discount !== null && (
+              <span className="rounded-full bg-green-500/10 px-2 py-1 text-[9px] font-bold text-green-400 sm:px-3 sm:text-xs">
+                -{discount}%
+              </span>
+            )}
+          </div>
+
+          <h3 className="mt-3 line-clamp-2 text-sm font-bold sm:mt-5 sm:text-xl">
+            {product.name}
+          </h3>
+
+          {product.description && (
+            <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-gray-400 sm:mt-3 sm:line-clamp-3 sm:text-sm sm:leading-6">
+              {product.description}
+            </p>
+          )}
+
+          {/* PREÇO */}
+
+          <div className="mt-3 sm:mt-6">
+            {oldPrice !== null &&
+              oldPrice > price && (
+                <div className="text-[10px] text-gray-500 line-through sm:text-sm">
+                  R${" "}
+                  {oldPrice
+                    .toFixed(2)
+                    .replace(".", ",")}
+                </div>
+              )}
+
+            <div className="mt-1 text-xl font-black sm:text-3xl">
+              R${" "}
+              {price
+                .toFixed(2)
+                .replace(".", ",")}
+            </div>
+          </div>
+
+          {/* BOTÕES */}
+
+          <div className="mt-3 grid gap-2 sm:mt-6 sm:gap-3">
+            <button
+              onClick={() =>
+                handleAddToCart(product)
+              }
+              className="w-full rounded-lg border border-orange-500 bg-orange-500/10 px-2 py-2.5 text-[9px] font-black leading-tight text-orange-400 transition hover:bg-orange-500 hover:text-black sm:rounded-xl sm:px-5 sm:py-4 sm:text-base"
+            >
+              🛒 ADICIONAR AO CARRINHO
+            </button>
+
+            <a
+              href={`/produto/${product.id}`}
+              className="w-full rounded-lg bg-orange-500 px-2 py-2.5 text-center text-[9px] font-black leading-tight text-black transition hover:bg-orange-400 sm:rounded-xl sm:px-5 sm:py-4 sm:text-base"
+            >
+              VER PRODUTO
+            </a>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#080808] text-white">
 
@@ -119,17 +284,14 @@ export default function Home() {
 
       {showCartNotification && (
         <div className="fixed bottom-5 left-4 right-4 z-[9999] sm:left-auto sm:right-6 sm:w-[380px]">
-
           <div className="rounded-2xl border border-orange-500/30 bg-[#111111] shadow-2xl shadow-black/60">
 
             <div className="flex items-center gap-3 p-4">
-
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-xl">
                 ✓
               </div>
 
               <div className="min-w-0 flex-1">
-
                 <p className="text-sm font-black text-white">
                   Produto adicionado!
                 </p>
@@ -137,21 +299,20 @@ export default function Home() {
                 <p className="mt-1 truncate text-xs text-gray-400">
                   {addedProductName}
                 </p>
-
               </div>
 
               <button
-                onClick={() => setShowCartNotification(false)}
+                onClick={() =>
+                  setShowCartNotification(false)
+                }
                 className="shrink-0 text-lg text-gray-500 transition hover:text-white"
                 aria-label="Fechar"
               >
                 ×
               </button>
-
             </div>
 
             <div className="flex items-center justify-between border-t border-white/10 px-4 py-3">
-
               <span className="text-xs text-gray-500">
                 Seu produto está no carrinho.
               </span>
@@ -162,25 +323,26 @@ export default function Home() {
               >
                 VER CARRINHO
               </a>
-
             </div>
 
           </div>
-
         </div>
       )}
 
       {/* HEADER */}
 
       <header className="border-b border-white/10">
-
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
 
           <a
             href="/"
             className="text-xl font-black"
           >
-            AMR<span className="text-orange-500">.</span>STORE
+            AMR
+            <span className="text-orange-500">
+              .
+            </span>
+            STORE
           </a>
 
           <div className="flex items-center gap-5">
@@ -203,9 +365,7 @@ export default function Home() {
             </a>
 
           </div>
-
         </div>
-
       </header>
 
       {/* HERO */}
@@ -235,7 +395,6 @@ export default function Home() {
           {/* BUSCA */}
 
           <div className="mx-auto mt-8 max-w-2xl">
-
             <div className="relative">
 
               <span className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-xl">
@@ -245,7 +404,9 @@ export default function Home() {
               <input
                 type="search"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
                 placeholder="O que você está procurando?"
                 className="w-full rounded-2xl border border-white/10 bg-white/[0.06] py-5 pl-14 pr-5 text-white outline-none transition placeholder:text-gray-500 focus:border-orange-500/60 focus:bg-white/[0.08]"
               />
@@ -260,21 +421,17 @@ export default function Home() {
               )}
 
             </div>
-
           </div>
 
         </div>
-
       </section>
 
       {/* CATEGORIAS */}
 
       <section className="px-5 pb-10">
-
         <div className="mx-auto max-w-6xl">
 
           <div className="mb-5">
-
             <h2 className="text-2xl font-bold">
               Categorias
             </h2>
@@ -282,13 +439,11 @@ export default function Home() {
             <p className="mt-2 text-sm text-gray-400">
               Encontre rapidamente o que procura.
             </p>
-
           </div>
 
           <div className="flex gap-3 overflow-x-auto pb-3">
 
             {categories.map((category) => {
-
               const selected =
                 selectedCategory === category;
 
@@ -296,7 +451,7 @@ export default function Home() {
                 <button
                   key={category}
                   onClick={() =>
-                    setSelectedCategory(category)
+                    handleSelectCategory(category)
                   }
                   className={`whitespace-nowrap rounded-full border px-5 py-3 text-sm font-bold transition ${
                     selected
@@ -307,251 +462,331 @@ export default function Home() {
                   {category}
                 </button>
               );
-
             })}
 
           </div>
-
         </div>
-
       </section>
 
-      {/* PRODUTOS */}
+      {/* CONTEÚDO */}
 
       <section className="px-5 pb-20">
-
         <div className="mx-auto max-w-6xl">
-
-          <div className="mb-8">
-
-            <h2 className="text-2xl font-bold">
-              {search.trim()
-                ? `Resultados para "${search}"`
-                : selectedCategory === "Todos"
-                ? "Produtos em destaque"
-                : selectedCategory}
-            </h2>
-
-            <p className="mt-2 text-gray-400">
-
-              {filteredProducts.length}{" "}
-
-              {filteredProducts.length === 1
-                ? "produto encontrado"
-                : "produtos encontrados"}
-
-            </p>
-
-          </div>
 
           {/* CARREGANDO */}
 
           {loading && (
-
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-10 text-center">
-
               <p className="text-gray-400">
                 Carregando produtos...
               </p>
-
             </div>
-
           )}
 
-          {/* SEM RESULTADOS */}
+          {/* BUSCA */}
 
           {!loading &&
-            filteredProducts.length === 0 && (
+            search.trim() !== "" && (
+              <div>
 
-              <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center">
+                <div className="mb-8">
+                  <h2 className="text-2xl font-bold">
+                    Resultados para "{search}"
+                  </h2>
 
-                <div className="text-5xl">
-                  🔎
+                  <p className="mt-2 text-gray-400">
+                    {searchResults.length}{" "}
+                    {searchResults.length === 1
+                      ? "produto encontrado"
+                      : "produtos encontrados"}
+                  </p>
                 </div>
 
-                <h3 className="mt-5 text-xl font-bold">
-                  Nenhum produto encontrado
-                </h3>
+                {searchResults.length === 0 ? (
+                  <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center">
 
-                <p className="mx-auto mt-2 max-w-md text-gray-500">
-                  Tente pesquisar por outro termo ou selecione
-                  outra categoria.
-                </p>
+                    <div className="text-5xl">
+                      🔎
+                    </div>
+
+                    <h3 className="mt-5 text-xl font-bold">
+                      Nenhum produto encontrado
+                    </h3>
+
+                    <p className="mx-auto mt-2 max-w-md text-gray-500">
+                      Tente pesquisar por outro termo.
+                    </p>
+
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {searchResults.map(
+                      (product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                        />
+                      )
+                    )}
+                  </div>
+                )}
 
               </div>
-
             )}
 
-          {/* PRODUTOS */}
+          {/* CATEGORIA SELECIONADA */}
 
           {!loading &&
-            filteredProducts.length > 0 && (
+            search.trim() === "" &&
+            selectedCategory !== "Todos" && (
+              <div>
 
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="mb-8 flex items-end justify-between gap-4">
 
-                {filteredProducts.map((product) => {
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-wider text-orange-400">
+                      Categoria
+                    </p>
 
-                  const price =
-                    Number(product.price ?? 0);
+                    <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+                      {selectedCategory}
+                    </h2>
 
-                  const oldPrice =
-                    product.old_price !== null
-                      ? Number(product.old_price)
-                      : null;
+                    <p className="mt-2 text-sm text-gray-400">
+                      {selectedCategoryProducts.length}{" "}
+                      {selectedCategoryProducts.length === 1
+                        ? "produto disponível"
+                        : "produtos disponíveis"}
+                    </p>
+                  </div>
 
-                  const discount =
-                    oldPrice !== null &&
-                    oldPrice > price
-                      ? Math.round(
-                          ((oldPrice - price) /
-                            oldPrice) *
-                            100
+                  <button
+                    onClick={() =>
+                      handleSelectCategory("Todos")
+                    }
+                    className="hidden rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold text-gray-300 transition hover:border-orange-500/40 hover:text-white sm:block"
+                  >
+                    ← Todas
+                  </button>
+
+                </div>
+
+                {selectedCategoryProducts.length === 0 ? (
+                  <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center">
+
+                    <div className="text-5xl">
+                      📦
+                    </div>
+
+                    <h3 className="mt-5 text-xl font-bold">
+                      Nenhum produto nesta categoria
+                    </h3>
+
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {selectedCategoryProducts.map(
+                      (product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                        />
+                      )
+                    )}
+                  </div>
+                )}
+
+              </div>
+            )}
+
+          {/* PÁGINA PRINCIPAL */}
+
+          {!loading &&
+            search.trim() === "" &&
+            selectedCategory === "Todos" && (
+              <div className="space-y-16">
+
+                {/* ADICIONADOS RECENTEMENTE */}
+
+                {recentProducts.length > 0 && (
+                  <section>
+
+                    <div className="mb-6 flex items-end justify-between gap-4">
+
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-wider text-orange-400">
+                          Novidades
+                        </p>
+
+                        <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+                          Adicionados recentemente
+                        </h2>
+
+                        <p className="mt-2 text-sm text-gray-400">
+                          Confira os produtos mais recentes da loja.
+                        </p>
+                      </div>
+
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      {recentProducts.map(
+                        (product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                          />
                         )
-                      : null;
+                      )}
+                    </div>
 
-                  return (
+                  </section>
+                )}
 
-                    <article
-                      key={product.id}
-                      className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-2xl transition duration-300 hover:-translate-y-1 hover:border-orange-500/40 sm:rounded-3xl"
-                    >
+                {/* CATEGORIAS */}
 
-                      {/* IMAGEM */}
+                {categories
+                  .filter(
+                    (category) =>
+                      category !== "Todos"
+                  )
+                  .map((category) => {
 
-                      <a
-                        href={`/produto/${product.id}`}
-                        className="block overflow-hidden"
+                    const categoryProducts =
+                      getCategoryProducts(
+                        category
+                      );
+
+                    if (
+                      categoryProducts.length === 0
+                    ) {
+                      return null;
+                    }
+
+                    const visibleProducts =
+                      categoryProducts.slice(
+                        0,
+                        PRODUCTS_PER_SECTION
+                      );
+
+                    const hasMore =
+                      categoryProducts.length >
+                      PRODUCTS_PER_SECTION;
+
+                    return (
+                      <section
+                        key={category}
+                        id={`categoria-${category
+                          .toLowerCase()
+                          .replace(
+                            /\s+/g,
+                            "-"
+                          )}`}
                       >
 
-                        {product.image_url ? (
+                        {/* CABEÇALHO */}
 
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="h-32 w-full object-cover transition duration-500 group-hover:scale-105 sm:h-52"
-                          />
+                        <div className="mb-6 flex items-end justify-between gap-4">
 
-                        ) : (
+                          <div>
+                            <p className="text-sm font-bold uppercase tracking-wider text-orange-400">
+                              Categoria
+                            </p>
 
-                          <div className="flex h-32 items-center justify-center bg-gradient-to-br from-orange-500/30 via-orange-600/10 to-black sm:h-52">
+                            <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+                              {category}
+                            </h2>
 
-                            <div className="text-center">
-
-                              <div className="text-3xl font-black sm:text-5xl">
-                                AMR
-                              </div>
-
-                              <div className="mt-1 text-[8px] uppercase tracking-[0.18em] text-orange-400 sm:mt-2 sm:text-xs sm:tracking-[0.25em]">
-                                {product.category ||
-                                  "Produto Digital"}
-                              </div>
-
-                            </div>
-
+                            <p className="mt-2 text-sm text-gray-400">
+                              {categoryProducts.length}{" "}
+                              {categoryProducts.length ===
+                              1
+                                ? "produto"
+                                : "produtos"}
+                            </p>
                           </div>
 
-                        )}
-
-                      </a>
-
-                      {/* INFORMAÇÕES */}
-
-                      <div className="p-3 sm:p-6">
-
-                        <div className="flex items-center justify-between gap-1">
-
-                          <span className="max-w-[75%] truncate rounded-full bg-orange-500/10 px-2 py-1 text-[9px] font-bold text-orange-400 sm:px-3 sm:text-xs">
-                            {product.category ||
-                              "Outros"}
-                          </span>
-
-                          {discount !== null && (
-                            <span className="rounded-full bg-green-500/10 px-2 py-1 text-[9px] font-bold text-green-400 sm:px-3 sm:text-xs">
-                              -{discount}%
-                            </span>
+                          {hasMore && (
+                            <button
+                              onClick={() =>
+                                handleSelectCategory(
+                                  category
+                                )
+                              }
+                              className="shrink-0 rounded-xl border border-orange-500/40 bg-orange-500/10 px-4 py-2.5 text-xs font-black text-orange-400 transition hover:bg-orange-500 hover:text-black sm:px-5 sm:py-3 sm:text-sm"
+                            >
+                              VER MAIS
+                            </button>
                           )}
 
                         </div>
 
-                        <h3 className="mt-3 line-clamp-2 text-sm font-bold sm:mt-5 sm:text-xl">
-                          {product.name}
-                        </h3>
+                        {/* PRODUTOS */}
 
-                        {product.description && (
+                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-                          <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-gray-400 sm:mt-3 sm:line-clamp-3 sm:text-sm sm:leading-6">
-                            {product.description}
-                          </p>
+                          {visibleProducts.map(
+                            (product) => (
+                              <ProductCard
+                                key={product.id}
+                                product={product}
+                              />
+                            )
+                          )}
 
+                        </div>
+
+                        {/* VER MAIS MOBILE */}
+
+                        {hasMore && (
+                          <div className="mt-5 flex justify-center sm:hidden">
+
+                            <button
+                              onClick={() =>
+                                handleSelectCategory(
+                                  category
+                                )
+                              }
+                              className="w-full rounded-xl border border-orange-500/40 bg-orange-500/10 px-5 py-3 text-sm font-black text-orange-400 transition hover:bg-orange-500 hover:text-black"
+                            >
+                              VER MAIS PRODUTOS DE{" "}
+                              {category.toUpperCase()}
+                            </button>
+
+                          </div>
                         )}
 
-                        {/* PREÇO */}
-
-                        <div className="mt-3 sm:mt-6">
-
-                          {oldPrice !== null &&
-                            oldPrice > price && (
-
-                              <div className="text-[10px] text-gray-500 line-through sm:text-sm">
-                                R${" "}
-                                {oldPrice
-                                  .toFixed(2)
-                                  .replace(
-                                    ".",
-                                    ","
-                                  )}
-                              </div>
-
-                            )}
-
-                          <div className="mt-1 text-xl font-black sm:text-3xl">
-                            R${" "}
-                            {price
-                              .toFixed(2)
-                              .replace(
-                                ".",
-                                ","
-                              )}
-                          </div>
-
-                        </div>
-
-                        {/* BOTÕES */}
-
-                        <div className="mt-3 grid gap-2 sm:mt-6 sm:gap-3">
-
-                          <button
-                            onClick={() =>
-                              handleAddToCart(product)
-                            }
-                            className="w-full rounded-lg border border-orange-500 bg-orange-500/10 px-2 py-2.5 text-[9px] font-black leading-tight text-orange-400 transition hover:bg-orange-500 hover:text-black sm:rounded-xl sm:px-5 sm:py-4 sm:text-base"
-                          >
-                            🛒 ADICIONAR AO CARRINHO
-                          </button>
-
-                          <a
-                            href={`/produto/${product.id}`}
-                            className="w-full rounded-lg bg-orange-500 px-2 py-2.5 text-center text-[9px] font-black leading-tight text-black transition hover:bg-orange-400 sm:rounded-xl sm:px-5 sm:py-4 sm:text-base"
-                          >
-                            VER PRODUTO
-                          </a>
-
-                        </div>
-
-                      </div>
-
-                    </article>
-
-                  );
-
-                })}
+                      </section>
+                    );
+                  })}
 
               </div>
+            )}
 
+          {/* NENHUM PRODUTO */}
+
+          {!loading &&
+            search.trim() === "" &&
+            selectedCategory === "Todos" &&
+            products.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-white/10 p-12 text-center">
+
+                <div className="text-5xl">
+                  📦
+                </div>
+
+                <h3 className="mt-5 text-xl font-bold">
+                  Nenhum produto disponível
+                </h3>
+
+                <p className="mx-auto mt-2 max-w-md text-gray-500">
+                  Os produtos aparecerão aqui quando forem adicionados à loja.
+                </p>
+
+              </div>
             )}
 
         </div>
-
       </section>
 
       {/* BENEFÍCIOS */}
@@ -563,7 +798,6 @@ export default function Home() {
           <div className="grid gap-6 sm:grid-cols-3">
 
             <div className="text-center">
-
               <div className="text-3xl">
                 🔒
               </div>
@@ -575,11 +809,9 @@ export default function Home() {
               <p className="mt-2 text-sm text-gray-500">
                 Processo simples e seguro.
               </p>
-
             </div>
 
             <div className="text-center">
-
               <div className="text-3xl">
                 ⚡
               </div>
@@ -591,11 +823,9 @@ export default function Home() {
               <p className="mt-2 text-sm text-gray-500">
                 Produtos digitais de forma prática.
               </p>
-
             </div>
 
             <div className="text-center">
-
               <div className="text-3xl">
                 💎
               </div>
@@ -607,13 +837,11 @@ export default function Home() {
               <p className="mt-2 text-sm text-gray-500">
                 Conteúdos para diferentes necessidades.
               </p>
-
             </div>
 
           </div>
 
         </div>
-
       </section>
 
       {/* FOOTER */}
