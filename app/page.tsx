@@ -219,7 +219,7 @@ export default function Home() {
           </span>
 
           <h1 className="mt-6 text-4xl font-black leading-tight sm:text-6xl">
-            Tudo o que você procura
+            Teste
             <span className="block text-orange-500">
               em um só lugar.
             </span>
