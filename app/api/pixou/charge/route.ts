@@ -1,20 +1,189 @@
 import { NextResponse } from "next/server";
 
-export async function POST(request: Request) {
+function onlyNumbers(value: unknown): string {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function isValidCPF(value: string): boolean {
+  const cpf = onlyNumbers(value);
+
+  if (cpf.length !== 11) {
+    return false;
+  }
+
+  if (/^(\d)\1{10}$/.test(cpf)) {
+    return false;
+  }
+
+  let sum = 0;
+
+  for (let i = 0; i < 9; i++) {
+    sum += Number(cpf[i]) * (10 - i);
+  }
+
+  let remainder = (sum * 10) % 11;
+
+  if (remainder === 10) {
+    remainder = 0;
+  }
+
+  if (remainder !== Number(cpf[9])) {
+    return false;
+  }
+
+  sum = 0;
+
+  for (let i = 0; i < 10; i++) {
+    sum += Number(cpf[i]) * (11 - i);
+  }
+
+  remainder = (sum * 10) % 11;
+
+  if (remainder === 10) {
+    remainder = 0;
+  }
+
+  return remainder === Number(cpf[10]);
+}
+
+function isValidCNPJ(value: string): boolean {
+  const cnpj = onlyNumbers(value);
+
+  if (cnpj.length !== 14) {
+    return false;
+  }
+
+  if (/^(\d)\1{13}$/.test(cnpj)) {
+    return false;
+  }
+
+  const firstWeights = [
+    5,
+    4,
+    3,
+    2,
+    9,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+  ];
+
+  let sum = 0;
+
+  for (let i = 0; i < 12; i++) {
+    sum +=
+      Number(cnpj[i]) *
+      firstWeights[i];
+  }
+
+  let remainder = sum % 11;
+  const digit1 =
+    remainder < 2 ? 0 : 11 - remainder;
+
+  if (digit1 !== Number(cnpj[12])) {
+    return false;
+  }
+
+  const secondWeights = [
+    6,
+    5,
+    4,
+    3,
+    2,
+    9,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+  ];
+
+  sum = 0;
+
+  for (let i = 0; i < 13; i++) {
+    sum +=
+      Number(cnpj[i]) *
+      secondWeights[i];
+  }
+
+  remainder = sum % 11;
+  const digit2 =
+    remainder < 2 ? 0 : 11 - remainder;
+
+  return digit2 === Number(cnpj[13]);
+}
+
+function isValidDocument(value: string): boolean {
+  const document = onlyNumbers(value);
+
+  if (document.length === 11) {
+    return isValidCPF(document);
+  }
+
+  if (document.length === 14) {
+    return isValidCNPJ(document);
+  }
+
+  return false;
+}
+
+function normalizePhone(value: unknown): string {
+  const phone = onlyNumbers(value);
+
+  if (phone.length === 11) {
+    return `55${phone}`;
+  }
+
+  if (
+    phone.length === 12 ||
+    phone.length === 13
+  ) {
+    return phone;
+  }
+
+  return "";
+}
+
+export async function POST(
+  request: Request
+) {
   try {
-    const secretKey = process.env.PIXOU_PAY_SECRET_KEY;
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    /*
+     * ==========================================
+     * CONFIGURAÇÃO
+     * ==========================================
+     */
+
+    const secretKey =
+      process.env.PIXOU_PAY_SECRET_KEY;
+
+    const siteUrl =
+      process.env.NEXT_PUBLIC_SITE_URL;
 
     if (!secretKey) {
       return NextResponse.json(
         {
-          error: "PIXOU_PAY_SECRET_KEY não configurada na Vercel.",
+          error:
+            "PIXOU_PAY_SECRET_KEY não configurada na Vercel.",
         },
         { status: 500 }
       );
     }
 
-    const body = await request.json();
+    /*
+     * ==========================================
+     * RECEBE O CHECKOUT
+     * ==========================================
+     */
+
+    const body =
+      await request.json();
 
     const {
       external_id,
@@ -32,15 +201,20 @@ export async function POST(request: Request) {
     if (!external_id) {
       return NextResponse.json(
         {
-          error: "external_id é obrigatório.",
+          error:
+            "external_id é obrigatório.",
         },
         { status: 400 }
       );
     }
 
-    const externalId = String(external_id)
-      .trim()
-      .replace(/[^a-zA-Z0-9_-]/g, "");
+    const externalId =
+      String(external_id)
+        .trim()
+        .replace(
+          /[^a-zA-Z0-9_-]/g,
+          ""
+        );
 
     if (
       externalId.length < 1 ||
@@ -59,27 +233,29 @@ export async function POST(request: Request) {
      * ==========================================
      * VALOR
      * ==========================================
-     *
-     * A Pixou trabalha em CENTAVOS.
-     *
-     * Exemplo:
-     * R$ 24,80 = 2480
      */
 
-    const numericAmount = Number(amount);
+    const numericAmount =
+      Number(amount);
 
-    if (!Number.isInteger(numericAmount)) {
+    if (
+      !Number.isInteger(
+        numericAmount
+      )
+    ) {
       return NextResponse.json(
         {
           error:
-            "O valor enviado deve ser um número inteiro em centavos.",
+            "O valor deve ser um número inteiro em centavos.",
           received: amount,
         },
         { status: 400 }
       );
     }
 
-    if (numericAmount < 600) {
+    if (
+      numericAmount < 600
+    ) {
       return NextResponse.json(
         {
           error:
@@ -89,7 +265,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (numericAmount > 300000) {
+    if (
+      numericAmount > 300000
+    ) {
       return NextResponse.json(
         {
           error:
@@ -101,149 +279,190 @@ export async function POST(request: Request) {
 
     /*
      * ==========================================
-     * PAYLOAD BASE
-     * ==========================================
-     */
-
-    const payload: Record<string, unknown> = {
-      external_id: externalId,
-      payment_method: "pix",
-      amount: numericAmount,
-    };
-
-    /*
-     * ==========================================
      * BUYER
      * ==========================================
      */
 
-    if (buyer) {
-      const buyerName = String(
-        buyer.name || ""
+    if (!buyer) {
+      return NextResponse.json(
+        {
+          error:
+            "Os dados do comprador são obrigatórios.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const buyerName =
+      String(
+        buyer.name ?? ""
       ).trim();
 
-      const buyerEmail = String(
-        buyer.email || ""
+    const buyerEmail =
+      String(
+        buyer.email ?? ""
       ).trim();
 
-      if (
-        buyerName.length < 3 ||
-        buyerName.length > 100
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "O nome deve possuir entre 3 e 100 caracteres.",
-          },
-          { status: 400 }
-        );
-      }
+    const buyerDocument =
+      onlyNumbers(
+        buyer.document
+      );
 
-      if (!buyerEmail) {
-        return NextResponse.json(
-          {
-            error: "O e-mail do comprador é obrigatório.",
-          },
-          { status: 400 }
-        );
-      }
+    const buyerPhone =
+      normalizePhone(
+        buyer.phone
+      );
 
-      /*
-       * WhatsApp
-       *
-       * A Pixou aceita 12 ou 13 dígitos.
-       *
-       * Se o cliente digitar:
-       * (91) 99999-9999
-       *
-       * vira:
-       * 91999999999
-       *
-       * Depois adicionamos 55:
-       * 5591999999999
-       */
+    /*
+     * NOME
+     */
 
-      let phone = "";
+    if (
+      buyerName.length < 3 ||
+      buyerName.length > 100
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "O nome deve possuir entre 3 e 100 caracteres.",
+        },
+        { status: 400 }
+      );
+    }
 
-      if (buyer.phone) {
-        const rawPhone = String(
-          buyer.phone
-        ).replace(/\D/g, "");
+    /*
+     * E-MAIL
+     */
 
-        if (rawPhone.length === 11) {
-          phone = `55${rawPhone}`;
-        } else if (
-          rawPhone.length === 12 ||
-          rawPhone.length === 13
-        ) {
-          phone = rawPhone;
-        } else {
-          return NextResponse.json(
-            {
-              error:
-                "O WhatsApp informado é inválido. Informe um número brasileiro com DDD.",
-            },
-            { status: 400 }
-          );
-        }
-      }
+    if (!buyerEmail) {
+      return NextResponse.json(
+        {
+          error:
+            "O e-mail do comprador é obrigatório.",
+        },
+        { status: 400 }
+      );
+    }
 
-      const buyerPayload: Record<string, unknown> = {
-        name: buyerName,
-        email: buyerEmail,
-      };
+    /*
+     * CPF/CNPJ
+     */
 
-      if (phone) {
-        buyerPayload.phone = phone;
-      }
+    if (!buyerDocument) {
+      return NextResponse.json(
+        {
+          error:
+            "CPF ou CNPJ é obrigatório.",
+        },
+        { status: 400 }
+      );
+    }
 
-      /*
-       * Documento é opcional.
-       * Só enviamos se realmente existir.
-       */
+    if (
+      !isValidDocument(
+        buyerDocument
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "O CPF ou CNPJ informado é inválido.",
+        },
+        { status: 400 }
+      );
+    }
 
-      if (buyer.document) {
-        const document = String(
-          buyer.document
-        ).replace(/\D/g, "");
+    /*
+     * WHATSAPP
+     */
 
-        if (document.length > 0) {
-          buyerPayload.document = document;
-        }
-      }
-
-      payload.buyer = buyerPayload;
+    if (!buyerPhone) {
+      return NextResponse.json(
+        {
+          error:
+            "O WhatsApp informado é inválido. Informe um número com DDD.",
+        },
+        { status: 400 }
+      );
     }
 
     /*
      * ==========================================
-     * PRODUCT
+     * PAYLOAD PARA PIXOU
      * ==========================================
+     *
+     * Conforme a documentação:
+     *
+     * external_id
+     * payment_method
+     * amount
+     * buyer
+     * product
+     * postbackUrl
+     *
+     * O document é enviado em buyer.document.
+     * A Pixou internamente utiliza esse valor
+     * como payer.taxId.
      */
 
-    if (product?.name) {
-      const productName = String(
-        product.name
-      ).trim();
+    const payload: Record<
+      string,
+      unknown
+    > = {
+      external_id:
+        externalId,
+
+      payment_method:
+        "pix",
+
+      amount:
+        numericAmount,
+
+      buyer: {
+        name:
+          buyerName,
+
+        email:
+          buyerEmail,
+
+        phone:
+          buyerPhone,
+
+        document:
+          buyerDocument,
+      },
+    };
+
+    /*
+     * PRODUTO
+     */
+
+    if (
+      product?.name
+    ) {
+      const productName =
+        String(
+          product.name
+        ).trim();
 
       if (productName) {
         payload.product = {
-          name: productName,
+          name:
+            productName,
         };
       }
     }
 
     /*
-     * ==========================================
      * WEBHOOK
-     * ==========================================
      */
 
     if (siteUrl) {
-      const cleanSiteUrl = siteUrl.replace(
-        /\/$/,
-        ""
-      );
+      const cleanSiteUrl =
+        siteUrl.replace(
+          /\/$/,
+          ""
+        );
 
       payload.postbackUrl =
         `${cleanSiteUrl}/api/pixou/webhook`;
@@ -251,50 +470,94 @@ export async function POST(request: Request) {
 
     /*
      * ==========================================
-     * LOG DO PAYLOAD
+     * LOG
      * ==========================================
+     *
+     * Não mostramos o CPF completo no log.
      */
+
+    const logPayload = {
+      ...payload,
+      buyer: {
+        ...(payload.buyer as Record<
+          string,
+          unknown
+        >),
+        document:
+          buyerDocument.length === 11
+            ? `***${buyerDocument.slice(
+                3,
+                9
+              )}**`
+            : `***${buyerDocument.slice(
+                3,
+                11
+              )}**`,
+      },
+    };
 
     console.log(
       "PIXOU - PAYLOAD:",
-      JSON.stringify(payload, null, 2)
+      JSON.stringify(
+        logPayload,
+        null,
+        2
+      )
     );
 
     /*
      * ==========================================
-     * ENVIA PARA PIXOU
+     * CHAMADA PIXOU
      * ==========================================
      */
 
-    const response = await fetch(
-      "https://api.pixoupay.com/charge",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${secretKey}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-        cache: "no-store",
-      }
-    );
+    const response =
+      await fetch(
+        "https://api.pixoupay.com/charge",
+        {
+          method: "POST",
+
+          headers: {
+            Authorization:
+              `Bearer ${secretKey}`,
+
+            "Content-Type":
+              "application/json",
+
+            Accept:
+              "application/json",
+          },
+
+          body:
+            JSON.stringify(
+              payload
+            ),
+
+          cache:
+            "no-store",
+        }
+      );
 
     /*
      * ==========================================
-     * LÊ A RESPOSTA
+     * RESPOSTA
      * ==========================================
      */
 
-    const responseText = await response.text();
+    const responseText =
+      await response.text();
 
-    let result: any = null;
+    let result: any;
 
     try {
-      result = JSON.parse(responseText);
+      result =
+        JSON.parse(
+          responseText
+        );
     } catch {
       result = {
-        raw: responseText,
+        raw:
+          responseText,
       };
     }
 
@@ -305,18 +568,22 @@ export async function POST(request: Request) {
 
     console.log(
       "PIXOU - RESPONSE:",
-      JSON.stringify(result, null, 2)
+      JSON.stringify(
+        result,
+        null,
+        2
+      )
     );
 
     /*
      * ==========================================
-     * ERRO DA PIXOU
+     * ERRO PIXOU
      * ==========================================
      */
 
     if (!response.ok) {
       const pixouError =
-        result?.error || {};
+        result?.error ?? {};
 
       return NextResponse.json(
         {
@@ -326,16 +593,47 @@ export async function POST(request: Request) {
 
           detail:
             pixouError?.detail ??
-            result?.detail ??
             null,
 
-          status: response.status,
+          code:
+            pixouError?.code ??
+            null,
 
-          pixou_response: result,
+          status:
+            response.status,
         },
         {
-          status: response.status,
+          status:
+            response.status,
         }
+      );
+    }
+
+    /*
+     * ==========================================
+     * VALIDA RESPOSTA
+     * ==========================================
+     */
+
+    if (!result?.data) {
+      return NextResponse.json(
+        {
+          error:
+            "A Pixou não retornou os dados da cobrança.",
+        },
+        { status: 502 }
+      );
+    }
+
+    if (
+      !result.data?.pix?.code
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "A Pixou criou a cobrança, mas não retornou o Pix Copia e Cola.",
+        },
+        { status: 502 }
       );
     }
 
@@ -345,31 +643,11 @@ export async function POST(request: Request) {
      * ==========================================
      */
 
-    if (!result?.data) {
-      return NextResponse.json(
-        {
-          error:
-            "A Pixou respondeu sem retornar os dados da cobrança.",
-          pixou_response: result,
-        },
-        { status: 502 }
-      );
-    }
-
-    if (!result.data?.pix?.code) {
-      return NextResponse.json(
-        {
-          error:
-            "A Pixou criou a cobrança, mas não retornou o Pix Copia e Cola.",
-          pixou_response: result,
-        },
-        { status: 502 }
-      );
-    }
-
     return NextResponse.json(
       result,
-      { status: 200 }
+      {
+        status: 200,
+      }
     );
   } catch (error) {
     console.error(
