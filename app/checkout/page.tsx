@@ -5,6 +5,7 @@ import {
   FormEvent,
   useState,
 } from "react";
+
 import { useCart } from "../context/CartContext";
 
 type PixData = {
@@ -14,24 +15,389 @@ type PixData = {
   total_amount: number;
   net_amount?: number;
   created_at?: string;
+
   pix?: {
     code?: string;
     qrcode_base64?: string;
   };
 };
 
-export default function CheckoutPage() {
-  const { cart, cartTotal } = useCart();
+/*
+ * ==========================================
+ * CPF
+ * ==========================================
+ */
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
+function onlyNumbers(
+  value: string
+): string {
+  return value.replace(
+    /\D/g,
+    ""
+  );
+}
+
+function isValidCPF(
+  value: string
+): boolean {
+  const cpf =
+    onlyNumbers(value);
+
+  if (
+    cpf.length !== 11
+  ) {
+    return false;
+  }
+
+  if (
+    /^(\d)\1{10}$/.test(
+      cpf
+    )
+  ) {
+    return false;
+  }
+
+  let sum = 0;
+
+  for (
+    let i = 0;
+    i < 9;
+    i++
+  ) {
+    sum +=
+      Number(cpf[i]) *
+      (10 - i);
+  }
+
+  let remainder =
+    (sum * 10) % 11;
+
+  if (
+    remainder === 10
+  ) {
+    remainder = 0;
+  }
+
+  if (
+    remainder !==
+    Number(cpf[9])
+  ) {
+    return false;
+  }
+
+  sum = 0;
+
+  for (
+    let i = 0;
+    i < 10;
+    i++
+  ) {
+    sum +=
+      Number(cpf[i]) *
+      (11 - i);
+  }
+
+  remainder =
+    (sum * 10) % 11;
+
+  if (
+    remainder === 10
+  ) {
+    remainder = 0;
+  }
+
+  return (
+    remainder ===
+    Number(cpf[10])
+  );
+}
+
+/*
+ * ==========================================
+ * CNPJ
+ * ==========================================
+ */
+
+function isValidCNPJ(
+  value: string
+): boolean {
+  const cnpj =
+    onlyNumbers(value);
+
+  if (
+    cnpj.length !== 14
+  ) {
+    return false;
+  }
+
+  if (
+    /^(\d)\1{13}$/.test(
+      cnpj
+    )
+  ) {
+    return false;
+  }
+
+  const firstWeights = [
+    5,
+    4,
+    3,
+    2,
+    9,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+  ];
+
+  let sum = 0;
+
+  for (
+    let i = 0;
+    i < 12;
+    i++
+  ) {
+    sum +=
+      Number(cnpj[i]) *
+      firstWeights[i];
+  }
+
+  let remainder =
+    sum % 11;
+
+  const digit1 =
+    remainder < 2
+      ? 0
+      : 11 - remainder;
+
+  if (
+    digit1 !==
+    Number(cnpj[12])
+  ) {
+    return false;
+  }
+
+  const secondWeights = [
+    6,
+    5,
+    4,
+    3,
+    2,
+    9,
+    8,
+    7,
+    6,
+    5,
+    4,
+    3,
+    2,
+  ];
+
+  sum = 0;
+
+  for (
+    let i = 0;
+    i < 13;
+    i++
+  ) {
+    sum +=
+      Number(cnpj[i]) *
+      secondWeights[i];
+  }
+
+  remainder =
+    sum % 11;
+
+  const digit2 =
+    remainder < 2
+      ? 0
+      : 11 - remainder;
+
+  return (
+    digit2 ===
+    Number(cnpj[13])
+  );
+}
+
+/*
+ * ==========================================
+ * DOCUMENTO
+ * ==========================================
+ */
+
+function isValidDocument(
+  value: string
+): boolean {
+  const document =
+    onlyNumbers(value);
+
+  if (
+    document.length === 11
+  ) {
+    return isValidCPF(
+      document
+    );
+  }
+
+  if (
+    document.length === 14
+  ) {
+    return isValidCNPJ(
+      document
+    );
+  }
+
+  return false;
+}
+
+/*
+ * ==========================================
+ * FORMATA CPF/CNPJ
+ * ==========================================
+ */
+
+function formatDocument(
+  value: string
+): string {
+  const numbers =
+    onlyNumbers(value);
+
+  /*
+   * CPF
+   */
+
+  if (
+    numbers.length <= 11
+  ) {
+    return numbers
+      .replace(
+        /^(\d{3})(\d)/,
+        "$1.$2"
+      )
+      .replace(
+        /^(\d{3})\.(\d{3})(\d)/,
+        "$1.$2.$3"
+      )
+      .replace(
+        /^(\d{3})\.(\d{3})\.(\d{3})(\d)/,
+        "$1.$2.$3-$4"
+      );
+  }
+
+  /*
+   * CNPJ
+   */
+
+  return numbers
+    .slice(0, 14)
+    .replace(
+      /^(\d{2})(\d)/,
+      "$1.$2"
+    )
+    .replace(
+      /^(\d{2})\.(\d{3})(\d)/,
+      "$1.$2.$3"
+    )
+    .replace(
+      /^(\d{2})\.(\d{3})\.(\d{3})(\d)/,
+      "$1.$2.$3/$4"
+    )
+    .replace(
+      /^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/,
+      "$1.$2.$3/$4-$5"
+    );
+}
+
+/*
+ * ==========================================
+ * FORMATA TELEFONE
+ * ==========================================
+ */
+
+function formatPhone(
+  value: string
+): string {
+  const numbers =
+    onlyNumbers(value)
+      .slice(0, 11);
+
+  if (
+    numbers.length <= 2
+  ) {
+    return numbers;
+  }
+
+  if (
+    numbers.length <= 7
+  ) {
+    return numbers.replace(
+      /^(\d{2})(\d+)/,
+      "($1) $2"
+    );
+  }
+
+  return numbers.replace(
+    /^(\d{2})(\d{5})(\d{0,4})/,
+    "($1) $2-$3"
+  );
+}
+
+/*
+ * ==========================================
+ * NORMALIZA TELEFONE
+ * ==========================================
+ */
+
+function normalizePhone(
+  value: string
+): string {
+  const numbers =
+    onlyNumbers(value);
+
+  if (
+    numbers.length === 11
+  ) {
+    return `55${numbers}`;
+  }
+
+  if (
+    numbers.length === 12 ||
+    numbers.length === 13
+  ) {
+    return numbers;
+  }
+
+  return "";
+}
+
+export default function CheckoutPage() {
+  const {
+    cart,
+    cartTotal,
+  } = useCart();
+
+  const [name, setName] =
+    useState("");
+
+  const [email, setEmail] =
+    useState("");
+
+  const [whatsapp, setWhatsapp] =
+    useState("");
+
+  const [document, setDocument] =
+    useState("");
 
   const [loading, setLoading] =
     useState(false);
 
   const [pix, setPix] =
-    useState<PixData | null>(null);
+    useState<PixData | null>(
+      null
+    );
 
   const [error, setError] =
     useState("");
@@ -41,41 +407,7 @@ export default function CheckoutPage() {
 
   /*
    * ==========================================
-   * TELEFONE
-   * ==========================================
-   *
-   * Converte:
-   * (91) 99999-9999
-   *
-   * para:
-   * 5591999999999
-   */
-
-  function normalizePhone(
-    value: string
-  ) {
-    const digits = value.replace(
-      /\D/g,
-      ""
-    );
-
-    if (digits.length === 11) {
-      return `55${digits}`;
-    }
-
-    if (
-      digits.length === 12 ||
-      digits.length === 13
-    ) {
-      return digits;
-    }
-
-    return "";
-  }
-
-  /*
-   * ==========================================
-   * GERAR PIX
+   * SUBMIT
    * ==========================================
    */
 
@@ -87,25 +419,25 @@ export default function CheckoutPage() {
     setError("");
     setCopied(false);
 
-    if (cart.length === 0) {
+    /*
+     * CARRINHO
+     */
+
+    if (
+      cart.length === 0
+    ) {
       setError(
         "Seu carrinho está vazio."
       );
       return;
     }
 
-    const cleanName =
-      name.trim();
-
-    const cleanEmail =
-      email.trim();
-
-    const cleanPhone =
-      normalizePhone(whatsapp);
-
     /*
      * NOME
      */
+
+    const cleanName =
+      name.trim();
 
     if (
       cleanName.length < 3
@@ -120,6 +452,9 @@ export default function CheckoutPage() {
      * E-MAIL
      */
 
+    const cleanEmail =
+      email.trim();
+
     if (!cleanEmail) {
       setError(
         "Digite seu e-mail."
@@ -131,6 +466,11 @@ export default function CheckoutPage() {
      * WHATSAPP
      */
 
+    const cleanPhone =
+      normalizePhone(
+        whatsapp
+      );
+
     if (!cleanPhone) {
       setError(
         "Digite um WhatsApp válido com DDD."
@@ -139,38 +479,51 @@ export default function CheckoutPage() {
     }
 
     /*
+     * CPF/CNPJ
+     */
+
+    const cleanDocument =
+      onlyNumbers(
+        document
+      );
+
+    if (
+      !cleanDocument
+    ) {
+      setError(
+        "Digite seu CPF ou CNPJ."
+      );
+      return;
+    }
+
+    if (
+      !isValidDocument(
+        cleanDocument
+      )
+    ) {
+      setError(
+        "O CPF ou CNPJ informado é inválido. Confira os números e tente novamente."
+      );
+      return;
+    }
+
+    /*
      * VALOR
      */
 
-    if (cartTotal < 6) {
+    if (
+      cartTotal < 6
+    ) {
       setError(
         "O valor mínimo para pagamento via Pix é R$ 6,00."
       );
       return;
     }
 
-    /*
-     * Converte reais para centavos.
-     *
-     * Exemplo:
-     * 24.80 → 2480
-     */
-
     const amountInCents =
       Math.round(
         cartTotal * 100
       );
-
-    if (
-      !Number.isInteger(
-        amountInCents
-      )
-    ) {
-      setError(
-        "Não foi possível calcular o valor da compra."
-      );
-      return;
-    }
 
     if (
       amountInCents < 600
@@ -194,8 +547,7 @@ export default function CheckoutPage() {
 
     try {
       /*
-       * Apenas letras, números,
-       * hífen e underscore.
+       * ID ÚNICO
        */
 
       const externalId =
@@ -204,7 +556,7 @@ export default function CheckoutPage() {
           .substring(2, 8)}`;
 
       /*
-       * Produto
+       * NOME DO PRODUTO
        */
 
       const productName =
@@ -232,6 +584,9 @@ export default function CheckoutPage() {
 
           phone:
             cleanPhone,
+
+          document:
+            cleanDocument,
         },
 
         product: {
@@ -242,11 +597,18 @@ export default function CheckoutPage() {
 
       console.log(
         "CHECKOUT - PAYLOAD:",
-        payload
+        {
+          ...payload,
+          buyer: {
+            ...payload.buyer,
+            document:
+              "***DOCUMENTO***",
+          },
+        }
       );
 
       /*
-       * CHAMADA PARA NOSSA API
+       * CHAMADA
        */
 
       const response =
@@ -258,6 +620,7 @@ export default function CheckoutPage() {
             headers: {
               "Content-Type":
                 "application/json",
+
               Accept:
                 "application/json",
             },
@@ -268,10 +631,6 @@ export default function CheckoutPage() {
               ),
           }
         );
-
-      /*
-       * Lê a resposta
-       */
 
       const result =
         await response.json();
@@ -285,15 +644,27 @@ export default function CheckoutPage() {
        * ERRO
        */
 
-      if (!response.ok) {
+      if (
+        !response.ok
+      ) {
         let message =
           result?.error ||
           "Não foi possível criar o pagamento.";
 
         /*
-         * Se a Pixou enviar detail
-         * como objeto, mostramos os
-         * detalhes também.
+         * Detail string
+         */
+
+        if (
+          typeof result?.detail ===
+          "string"
+        ) {
+          message +=
+            ` ${result.detail}`;
+        }
+
+        /*
+         * Detail objeto
          */
 
         if (
@@ -307,13 +678,6 @@ export default function CheckoutPage() {
                 result.detail
               )}`;
           } catch {}
-        } else if (
-          result?.detail
-        ) {
-          message +=
-            ` ${String(
-              result.detail
-            )}`;
         }
 
         throw new Error(
@@ -322,17 +686,19 @@ export default function CheckoutPage() {
       }
 
       /*
-       * Verifica data
+       * DATA
        */
 
-      if (!result?.data) {
+      if (
+        !result?.data
+      ) {
         throw new Error(
           "A Pixou Pay não retornou os dados da cobrança."
         );
       }
 
       /*
-       * Verifica Pix
+       * PIX
        */
 
       if (
@@ -417,10 +783,6 @@ export default function CheckoutPage() {
       return null;
     }
 
-    /*
-     * URL ou Data URI
-     */
-
     if (
       cleanValue.startsWith(
         "data:image/"
@@ -435,19 +797,11 @@ export default function CheckoutPage() {
       return cleanValue;
     }
 
-    /*
-     * Base64
-     */
-
     const base64 =
       cleanValue.replace(
         /\s/g,
         ""
       );
-
-    /*
-     * SVG
-     */
 
     if (
       base64.startsWith(
@@ -460,16 +814,13 @@ export default function CheckoutPage() {
       return `data:image/svg+xml;base64,${base64}`;
     }
 
-    /*
-     * PNG
-     */
-
     return `data:image/png;base64,${base64}`;
   }
 
   const qrCodeSource =
     getQrCodeSource(
-      pix?.pix?.qrcode_base64
+      pix?.pix
+        ?.qrcode_base64
     );
 
   /*
@@ -544,7 +895,7 @@ export default function CheckoutPage() {
 
   /*
    * ==========================================
-   * PÁGINA
+   * PÁGINA PRINCIPAL
    * ==========================================
    */
 
@@ -610,9 +961,17 @@ export default function CheckoutPage() {
 
                   <p className="mt-1 text-4xl font-black text-orange-500">
                     R${" "}
-                    {(pix.total_amount / 100)
-                      .toFixed(2)
-                      .replace(".", ",")}
+                    {(
+                      pix.total_amount /
+                      100
+                    )
+                      .toFixed(
+                        2
+                      )
+                      .replace(
+                        ".",
+                        ","
+                      )}
                   </p>
 
                 </div>
@@ -622,10 +981,14 @@ export default function CheckoutPage() {
                   <div className="mx-auto mt-7 flex w-fit items-center justify-center rounded-2xl bg-white p-5">
 
                     <img
-                      src={qrCodeSource}
+                      src={
+                        qrCodeSource
+                      }
                       alt="QR Code para pagamento Pix"
                       className="h-64 w-64 object-contain"
-                      onError={(event) => {
+                      onError={(
+                        event
+                      ) => {
                         console.error(
                           "Erro ao carregar QR Code."
                         );
@@ -642,8 +1005,7 @@ export default function CheckoutPage() {
                   <div className="mx-auto mt-7 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5">
 
                     <p className="text-sm text-yellow-400">
-                      O QR Code não foi disponibilizado.
-                      Utilize o Pix Copia e Cola abaixo.
+                      O QR Code não foi disponibilizado. Utilize o Pix Copia e Cola abaixo.
                     </p>
 
                   </div>
@@ -659,7 +1021,8 @@ export default function CheckoutPage() {
                   <textarea
                     readOnly
                     value={
-                      pix.pix?.code ||
+                      pix.pix
+                        ?.code ||
                       ""
                     }
                     className="h-32 w-full resize-none rounded-xl border border-white/10 bg-black/50 p-3 text-xs leading-5 text-gray-300 outline-none focus:border-orange-500"
@@ -669,7 +1032,9 @@ export default function CheckoutPage() {
 
                 <button
                   type="button"
-                  onClick={copyPix}
+                  onClick={
+                    copyPix
+                  }
                   className="mt-4 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400"
                 >
                   {copied
@@ -714,6 +1079,12 @@ export default function CheckoutPage() {
 
               <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
 
+                {/*
+                 * ==================================
+                 * FORMULÁRIO
+                 * ==================================
+                 */}
+
                 <form
                   onSubmit={
                     handleSubmit
@@ -737,6 +1108,10 @@ export default function CheckoutPage() {
 
                   )}
 
+                  {/*
+                   * NOME
+                   */}
+
                   <div className="mt-7">
 
                     <label
@@ -750,18 +1125,27 @@ export default function CheckoutPage() {
                       id="name"
                       type="text"
                       value={name}
-                      onChange={(event) =>
+                      onChange={(
+                        event
+                      ) =>
                         setName(
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                       placeholder="Digite seu nome completo"
                       required
-                      disabled={loading}
+                      disabled={
+                        loading
+                      }
                       className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
                     />
 
                   </div>
+
+                  {/*
+                   * E-MAIL
+                   */}
 
                   <div className="mt-5">
 
@@ -776,18 +1160,27 @@ export default function CheckoutPage() {
                       id="email"
                       type="email"
                       value={email}
-                      onChange={(event) =>
+                      onChange={(
+                        event
+                      ) =>
                         setEmail(
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                       placeholder="seuemail@email.com"
                       required
-                      disabled={loading}
+                      disabled={
+                        loading
+                      }
                       className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
                     />
 
                   </div>
+
+                  {/*
+                   * WHATSAPP
+                   */}
 
                   <div className="mt-5">
 
@@ -801,15 +1194,26 @@ export default function CheckoutPage() {
                     <input
                       id="whatsapp"
                       type="tel"
-                      value={whatsapp}
-                      onChange={(event) =>
+                      inputMode="numeric"
+                      value={
+                        whatsapp
+                      }
+                      onChange={(
+                        event
+                      ) =>
                         setWhatsapp(
-                          event.target.value
+                          formatPhone(
+                            event
+                              .target
+                              .value
+                          )
                         )
                       }
                       placeholder="(91) 99999-9999"
                       required
-                      disabled={loading}
+                      disabled={
+                        loading
+                      }
                       className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
                     />
 
@@ -818,6 +1222,56 @@ export default function CheckoutPage() {
                     </p>
 
                   </div>
+
+                  {/*
+                   * CPF/CNPJ
+                   */}
+
+                  <div className="mt-5">
+
+                    <label
+                      htmlFor="document"
+                      className="mb-2 block text-sm font-bold"
+                    >
+                      CPF ou CNPJ
+                    </label>
+
+                    <input
+                      id="document"
+                      type="text"
+                      inputMode="numeric"
+                      value={
+                        document
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setDocument(
+                          formatDocument(
+                            event
+                              .target
+                              .value
+                          )
+                        )
+                      }
+                      placeholder="Digite seu CPF ou CNPJ"
+                      required
+                      disabled={
+                        loading
+                      }
+                      maxLength={18}
+                      className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
+                    />
+
+                    <p className="mt-2 text-xs text-gray-600">
+                      Necessário para processar o pagamento Pix.
+                    </p>
+
+                  </div>
+
+                  {/*
+                   * SEGURANÇA
+                   */}
 
                   <div className="mt-7 rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
 
@@ -843,9 +1297,15 @@ export default function CheckoutPage() {
 
                   </div>
 
+                  {/*
+                   * PAGAR
+                   */}
+
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={
+                      loading
+                    }
                     className="mt-7 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {loading
@@ -854,6 +1314,12 @@ export default function CheckoutPage() {
                   </button>
 
                 </form>
+
+                {/*
+                 * ==================================
+                 * RESUMO
+                 * ==================================
+                 */}
 
                 <aside className="h-fit rounded-3xl border border-white/10 bg-white/[0.04] p-6 lg:sticky lg:top-6">
 
@@ -864,7 +1330,9 @@ export default function CheckoutPage() {
                   <div className="mt-6 space-y-4">
 
                     {cart.map(
-                      (product) => (
+                      (
+                        product
+                      ) => (
 
                         <div
                           key={
