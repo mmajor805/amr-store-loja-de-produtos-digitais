@@ -12,6 +12,8 @@ type PixData = {
   status: string;
   payment_method: string;
   total_amount: number;
+  net_amount?: number;
+  created_at?: string;
   pix?: {
     code?: string;
     qrcode_base64?: string;
@@ -37,60 +39,45 @@ export default function CheckoutPage() {
   const [copied, setCopied] =
     useState(false);
 
-  // =====================================================
-  // FORMATA WHATSAPP
-  // =====================================================
+  /*
+   * ==========================================
+   * TELEFONE
+   * ==========================================
+   *
+   * Converte:
+   * (91) 99999-9999
+   *
+   * para:
+   * 5591999999999
+   */
 
-  function normalizeWhatsapp(
+  function normalizePhone(
     value: string
-  ): string | null {
-    let phone = value.replace(
+  ) {
+    const digits = value.replace(
       /\D/g,
       ""
     );
 
-    if (!phone) {
-      return null;
-    }
-
-    /*
-     * Se o usuário colocar:
-     *
-     * (91) 99999-9999
-     *
-     * vira:
-     *
-     * 91999999999
-     *
-     * Depois adicionamos 55:
-     *
-     * 5591999999999
-     */
-
-    if (phone.startsWith("55")) {
-      if (
-        phone.length === 12 ||
-        phone.length === 13
-      ) {
-        return phone;
-      }
-
-      return null;
+    if (digits.length === 11) {
+      return `55${digits}`;
     }
 
     if (
-      phone.length === 10 ||
-      phone.length === 11
+      digits.length === 12 ||
+      digits.length === 13
     ) {
-      return `55${phone}`;
+      return digits;
     }
 
-    return null;
+    return "";
   }
 
-  // =====================================================
-  // GERAR PAGAMENTO
-  // =====================================================
+  /*
+   * ==========================================
+   * GERAR PIX
+   * ==========================================
+   */
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
@@ -100,10 +87,6 @@ export default function CheckoutPage() {
     setError("");
     setCopied(false);
 
-    // ---------------------------------------------------
-    // CARRINHO
-    // ---------------------------------------------------
-
     if (cart.length === 0) {
       setError(
         "Seu carrinho está vazio."
@@ -111,16 +94,21 @@ export default function CheckoutPage() {
       return;
     }
 
-    // ---------------------------------------------------
-    // NOME
-    // ---------------------------------------------------
-
     const cleanName =
       name.trim();
 
+    const cleanEmail =
+      email.trim();
+
+    const cleanPhone =
+      normalizePhone(whatsapp);
+
+    /*
+     * NOME
+     */
+
     if (
-      cleanName.length < 3 ||
-      cleanName.length > 100
+      cleanName.length < 3
     ) {
       setError(
         "Digite seu nome completo."
@@ -128,12 +116,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    // ---------------------------------------------------
-    // E-MAIL
-    // ---------------------------------------------------
-
-    const cleanEmail =
-      email.trim().toLowerCase();
+    /*
+     * E-MAIL
+     */
 
     if (!cleanEmail) {
       setError(
@@ -142,90 +127,127 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        cleanEmail
-      )
-    ) {
+    /*
+     * WHATSAPP
+     */
+
+    if (!cleanPhone) {
       setError(
-        "Digite um e-mail válido."
+        "Digite um WhatsApp válido com DDD."
       );
       return;
     }
 
-    // ---------------------------------------------------
-    // WHATSAPP
-    // ---------------------------------------------------
+    /*
+     * VALOR
+     */
 
-    const cleanWhatsapp =
-      normalizeWhatsapp(
-        whatsapp
-      );
-
-    if (!cleanWhatsapp) {
-      setError(
-        "Digite um WhatsApp válido com DDD. Exemplo: (91) 99999-9999."
-      );
-      return;
-    }
-
-    // ---------------------------------------------------
-    // VALOR
-    // ---------------------------------------------------
-
-    const amount = Math.round(
-      cartTotal * 100
-    );
-
-    if (!Number.isInteger(amount)) {
-      setError(
-        "Não foi possível calcular o valor da compra."
-      );
-      return;
-    }
-
-    if (amount < 600) {
+    if (cartTotal < 6) {
       setError(
         "O valor mínimo para pagamento via Pix é R$ 6,00."
       );
       return;
     }
 
-    if (amount > 300000) {
+    /*
+     * Converte reais para centavos.
+     *
+     * Exemplo:
+     * 24.80 → 2480
+     */
+
+    const amountInCents =
+      Math.round(
+        cartTotal * 100
+      );
+
+    if (
+      !Number.isInteger(
+        amountInCents
+      )
+    ) {
+      setError(
+        "Não foi possível calcular o valor da compra."
+      );
+      return;
+    }
+
+    if (
+      amountInCents < 600
+    ) {
+      setError(
+        "O valor mínimo para pagamento via Pix é R$ 6,00."
+      );
+      return;
+    }
+
+    if (
+      amountInCents > 300000
+    ) {
       setError(
         "O valor máximo para pagamento via Pix é R$ 3.000,00."
       );
       return;
     }
 
-    // ---------------------------------------------------
-    // LOADING
-    // ---------------------------------------------------
-
     setLoading(true);
 
     try {
-      // -------------------------------------------------
-      // EXTERNAL ID
-      // -------------------------------------------------
+      /*
+       * Apenas letras, números,
+       * hífen e underscore.
+       */
 
       const externalId =
         `pedido-${Date.now()}-${Math.random()
           .toString(36)
           .substring(2, 8)}`;
 
-      // -------------------------------------------------
-      // PRODUTO
-      // -------------------------------------------------
+      /*
+       * Produto
+       */
 
       const productName =
         cart.length === 1
           ? cart[0].name
           : `${cart.length} produtos AMR.STORE`;
 
-      // -------------------------------------------------
-      // REQUEST
-      // -------------------------------------------------
+      /*
+       * PAYLOAD
+       */
+
+      const payload = {
+        external_id:
+          externalId,
+
+        amount:
+          amountInCents,
+
+        buyer: {
+          name:
+            cleanName,
+
+          email:
+            cleanEmail,
+
+          phone:
+            cleanPhone,
+        },
+
+        product: {
+          name:
+            productName,
+        },
+      };
+
+      console.log(
+        "CHECKOUT - PAYLOAD:",
+        payload
+      );
+
+      /*
+       * CHAMADA PARA NOSSA API
+       */
 
       const response =
         await fetch(
@@ -236,67 +258,72 @@ export default function CheckoutPage() {
             headers: {
               "Content-Type":
                 "application/json",
+              Accept:
+                "application/json",
             },
 
-            body: JSON.stringify({
-              external_id:
-                externalId,
-
-              payment_method:
-                "pix",
-
-              amount,
-
-              buyer: {
-                name: cleanName,
-                email: cleanEmail,
-                phone:
-                  cleanWhatsapp,
-              },
-
-              product: {
-                name:
-                  productName,
-              },
-            }),
+            body:
+              JSON.stringify(
+                payload
+              ),
           }
         );
 
-      // -------------------------------------------------
-      // RESPOSTA
-      // -------------------------------------------------
+      /*
+       * Lê a resposta
+       */
 
       const result =
         await response.json();
 
-      if (!response.ok) {
-        console.error(
-          "Erro da API:",
-          result
-        );
+      console.log(
+        "CHECKOUT - RESPONSE:",
+        result
+      );
 
-        let errorMessage =
+      /*
+       * ERRO
+       */
+
+      if (!response.ok) {
+        let message =
           result?.error ||
           "Não foi possível criar o pagamento.";
 
-        // Caso a API retorne detalhes
+        /*
+         * Se a Pixou enviar detail
+         * como objeto, mostramos os
+         * detalhes também.
+         */
+
         if (
           result?.detail &&
           typeof result.detail ===
-            "string"
+            "object"
         ) {
-          errorMessage +=
-            ` ${result.detail}`;
+          try {
+            message +=
+              ` ${JSON.stringify(
+                result.detail
+              )}`;
+          } catch {}
+        } else if (
+          result?.detail
+        ) {
+          message +=
+            ` ${String(
+              result.detail
+            )}`;
         }
 
         throw new Error(
-          errorMessage
+          message
         );
       }
 
-      // -------------------------------------------------
-      // DATA
-      // -------------------------------------------------
+      /*
+       * Verifica data
+       */
 
       if (!result?.data) {
         throw new Error(
@@ -304,32 +331,28 @@ export default function CheckoutPage() {
         );
       }
 
-      // -------------------------------------------------
-      // PIX
-      // -------------------------------------------------
-
-      if (!result.data.pix) {
-        throw new Error(
-          "A Pixou Pay não retornou os dados do Pix."
-        );
-      }
+      /*
+       * Verifica Pix
+       */
 
       if (
-        !result.data.pix.code
+        !result.data?.pix?.code
       ) {
         throw new Error(
-          "A Pixou Pay não retornou o código Pix Copia e Cola."
+          "A Pixou Pay não retornou o código Pix."
         );
       }
 
-      // -------------------------------------------------
-      // SUCESSO
-      // -------------------------------------------------
+      /*
+       * SUCESSO
+       */
 
-      setPix(result.data);
+      setPix(
+        result.data
+      );
     } catch (err) {
       console.error(
-        "Erro ao criar pagamento Pix:",
+        "ERRO AO CRIAR PIX:",
         err
       );
 
@@ -343,9 +366,11 @@ export default function CheckoutPage() {
     }
   }
 
-  // =====================================================
-  // COPIAR PIX
-  // =====================================================
+  /*
+   * ==========================================
+   * COPIAR PIX
+   * ==========================================
+   */
 
   async function copyPix() {
     const code =
@@ -372,9 +397,11 @@ export default function CheckoutPage() {
     }
   }
 
-  // =====================================================
-  // QR CODE
-  // =====================================================
+  /*
+   * ==========================================
+   * QR CODE
+   * ==========================================
+   */
 
   function getQrCodeSource(
     value?: string
@@ -390,8 +417,14 @@ export default function CheckoutPage() {
       return null;
     }
 
-    // URL
+    /*
+     * URL ou Data URI
+     */
+
     if (
+      cleanValue.startsWith(
+        "data:image/"
+      ) ||
       cleanValue.startsWith(
         "http://"
       ) ||
@@ -402,23 +435,20 @@ export default function CheckoutPage() {
       return cleanValue;
     }
 
-    // Data URI
-    if (
-      cleanValue.startsWith(
-        "data:image/"
-      )
-    ) {
-      return cleanValue;
-    }
+    /*
+     * Base64
+     */
 
-    // Base64
     const base64 =
       cleanValue.replace(
         /\s/g,
         ""
       );
 
-    // SVG
+    /*
+     * SVG
+     */
+
     if (
       base64.startsWith(
         "PHN2Zy"
@@ -430,7 +460,10 @@ export default function CheckoutPage() {
       return `data:image/svg+xml;base64,${base64}`;
     }
 
-    // PNG
+    /*
+     * PNG
+     */
+
     return `data:image/png;base64,${base64}`;
   }
 
@@ -439,9 +472,11 @@ export default function CheckoutPage() {
       pix?.pix?.qrcode_base64
     );
 
-  // =====================================================
-  // CARRINHO VAZIO
-  // =====================================================
+  /*
+   * ==========================================
+   * CARRINHO VAZIO
+   * ==========================================
+   */
 
   if (
     cart.length === 0 &&
@@ -507,14 +542,14 @@ export default function CheckoutPage() {
     );
   }
 
-  // =====================================================
-  // PÁGINA
-  // =====================================================
+  /*
+   * ==========================================
+   * PÁGINA
+   * ==========================================
+   */
 
   return (
     <main className="min-h-screen bg-[#080808] text-white">
-
-      {/* HEADER */}
 
       <header className="border-b border-white/10">
 
@@ -539,23 +574,21 @@ export default function CheckoutPage() {
 
       </header>
 
-      {/* CONTEÚDO */}
-
       <section className="px-5 py-10 sm:py-16">
 
         <div className="mx-auto max-w-5xl">
 
-          {/* =================================================
-              PIX GERADO
-          ================================================= */}
+          {/*
+           * ==================================
+           * PIX GERADO
+           * ==================================
+           */}
 
           {pix ? (
 
             <div className="mx-auto max-w-lg">
 
               <div className="rounded-3xl border border-green-500/20 bg-white/[0.04] p-6 text-center sm:p-8">
-
-                {/* SUCESSO */}
 
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 text-3xl text-green-400">
                   ✓
@@ -569,8 +602,6 @@ export default function CheckoutPage() {
                   Faça o pagamento usando o QR Code abaixo.
                 </p>
 
-                {/* VALOR */}
-
                 <div className="mt-6">
 
                   <p className="text-sm text-gray-500">
@@ -579,36 +610,24 @@ export default function CheckoutPage() {
 
                   <p className="mt-1 text-4xl font-black text-orange-500">
                     R${" "}
-                    {(
-                      pix.total_amount /
-                      100
-                    )
+                    {(pix.total_amount / 100)
                       .toFixed(2)
-                      .replace(
-                        ".",
-                        ","
-                      )}
+                      .replace(".", ",")}
                   </p>
 
                 </div>
-
-                {/* QR CODE */}
 
                 {qrCodeSource ? (
 
                   <div className="mx-auto mt-7 flex w-fit items-center justify-center rounded-2xl bg-white p-5">
 
                     <img
-                      src={
-                        qrCodeSource
-                      }
+                      src={qrCodeSource}
                       alt="QR Code para pagamento Pix"
                       className="h-64 w-64 object-contain"
-                      onError={(
-                        event
-                      ) => {
+                      onError={(event) => {
                         console.error(
-                          "Não foi possível carregar o QR Code Pix."
+                          "Erro ao carregar QR Code."
                         );
 
                         event.currentTarget.style.display =
@@ -623,14 +642,13 @@ export default function CheckoutPage() {
                   <div className="mx-auto mt-7 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5">
 
                     <p className="text-sm text-yellow-400">
-                      O QR Code não foi disponibilizado. Utilize o Pix Copia e Cola abaixo.
+                      O QR Code não foi disponibilizado.
+                      Utilize o Pix Copia e Cola abaixo.
                     </p>
 
                   </div>
 
                 )}
-
-                {/* COPIA E COLA */}
 
                 <div className="mt-7 text-left">
 
@@ -649,21 +667,15 @@ export default function CheckoutPage() {
 
                 </div>
 
-                {/* COPIAR */}
-
                 <button
                   type="button"
-                  onClick={
-                    copyPix
-                  }
+                  onClick={copyPix}
                   className="mt-4 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400"
                 >
                   {copied
                     ? "✓ PIX COPIADO"
                     : "COPIAR PIX"}
                 </button>
-
-                {/* AVISO */}
 
                 <div className="mt-6 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-left">
 
@@ -684,10 +696,6 @@ export default function CheckoutPage() {
           ) : (
 
             <>
-              {/* =================================================
-                  TÍTULO
-              ================================================= */}
-
               <div className="mb-10">
 
                 <span className="text-sm font-bold uppercase tracking-widest text-orange-500">
@@ -706,10 +714,6 @@ export default function CheckoutPage() {
 
               <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
 
-                {/* =================================================
-                    FORMULÁRIO
-                ================================================= */}
-
                 <form
                   onSubmit={
                     handleSubmit
@@ -725,17 +729,13 @@ export default function CheckoutPage() {
                     Usaremos esses dados para identificar sua compra e processar o pedido.
                   </p>
 
-                  {/* ERRO */}
-
                   {error && (
 
-                    <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
+                    <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm leading-6 text-red-400">
                       {error}
                     </div>
 
                   )}
-
-                  {/* NOME */}
 
                   <div className="mt-7">
 
@@ -750,28 +750,18 @@ export default function CheckoutPage() {
                       id="name"
                       type="text"
                       value={name}
-                      onChange={(
-                        event
-                      ) =>
+                      onChange={(event) =>
                         setName(
-                          event
-                            .target
-                            .value
+                          event.target.value
                         )
                       }
                       placeholder="Digite seu nome completo"
                       required
-                      disabled={
-                        loading
-                      }
-                      minLength={3}
-                      maxLength={100}
+                      disabled={loading}
                       className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
                     />
 
                   </div>
-
-                  {/* EMAIL */}
 
                   <div className="mt-5">
 
@@ -786,26 +776,18 @@ export default function CheckoutPage() {
                       id="email"
                       type="email"
                       value={email}
-                      onChange={(
-                        event
-                      ) =>
+                      onChange={(event) =>
                         setEmail(
-                          event
-                            .target
-                            .value
+                          event.target.value
                         )
                       }
                       placeholder="seuemail@email.com"
                       required
-                      disabled={
-                        loading
-                      }
+                      disabled={loading}
                       className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
                     />
 
                   </div>
-
-                  {/* WHATSAPP */}
 
                   <div className="mt-5">
 
@@ -820,20 +802,14 @@ export default function CheckoutPage() {
                       id="whatsapp"
                       type="tel"
                       value={whatsapp}
-                      onChange={(
-                        event
-                      ) =>
+                      onChange={(event) =>
                         setWhatsapp(
-                          event
-                            .target
-                            .value
+                          event.target.value
                         )
                       }
                       placeholder="(91) 99999-9999"
                       required
-                      disabled={
-                        loading
-                      }
+                      disabled={loading}
                       className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-4 outline-none placeholder:text-gray-600 focus:border-orange-500 disabled:opacity-50"
                     />
 
@@ -842,8 +818,6 @@ export default function CheckoutPage() {
                     </p>
 
                   </div>
-
-                  {/* SEGURANÇA */}
 
                   <div className="mt-7 rounded-2xl border border-green-500/20 bg-green-500/5 p-4">
 
@@ -869,13 +843,9 @@ export default function CheckoutPage() {
 
                   </div>
 
-                  {/* BOTÃO */}
-
                   <button
                     type="submit"
-                    disabled={
-                      loading
-                    }
+                    disabled={loading}
                     className="mt-7 w-full rounded-xl bg-orange-500 px-5 py-4 font-black text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {loading
@@ -884,10 +854,6 @@ export default function CheckoutPage() {
                   </button>
 
                 </form>
-
-                {/* =================================================
-                    RESUMO
-                ================================================= */}
 
                 <aside className="h-fit rounded-3xl border border-white/10 bg-white/[0.04] p-6 lg:sticky lg:top-6">
 
@@ -898,9 +864,7 @@ export default function CheckoutPage() {
                   <div className="mt-6 space-y-4">
 
                     {cart.map(
-                      (
-                        product
-                      ) => (
+                      (product) => (
 
                         <div
                           key={
@@ -968,7 +932,6 @@ export default function CheckoutPage() {
                 </aside>
 
               </div>
-
             </>
 
           )}
@@ -976,8 +939,6 @@ export default function CheckoutPage() {
         </div>
 
       </section>
-
-      {/* FOOTER */}
 
       <footer className="border-t border-white/10 px-5 py-8 text-center text-sm text-gray-500">
         © 2026 AMR.STORE — Todos os direitos reservados.
