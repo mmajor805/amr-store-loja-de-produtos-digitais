@@ -8,8 +8,7 @@ export async function POST(request: Request) {
     if (!secretKey) {
       return NextResponse.json(
         {
-          error:
-            "PIXOU_PAY_SECRET_KEY não está configurada na Vercel.",
+          error: "PIXOU_PAY_SECRET_KEY não configurada na Vercel.",
         },
         { status: 500 }
       );
@@ -24,9 +23,11 @@ export async function POST(request: Request) {
       product,
     } = body;
 
-    // =====================================================
-    // EXTERNAL ID
-    // =====================================================
+    /*
+     * ==========================================
+     * EXTERNAL ID
+     * ==========================================
+     */
 
     if (!external_id) {
       return NextResponse.json(
@@ -37,27 +38,33 @@ export async function POST(request: Request) {
       );
     }
 
-    const externalId = String(external_id).trim();
+    const externalId = String(external_id)
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, "");
 
-    // A Pixou aceita apenas:
-    // letras, números, hífens e underscores
     if (
       externalId.length < 1 ||
-      externalId.length > 255 ||
-      !/^[a-zA-Z0-9_-]+$/.test(externalId)
+      externalId.length > 255
     ) {
       return NextResponse.json(
         {
           error:
-            "external_id inválido. Use apenas letras, números, hífens e underscores.",
+            "external_id deve possuir entre 1 e 255 caracteres.",
         },
         { status: 400 }
       );
     }
 
-    // =====================================================
-    // VALOR
-    // =====================================================
+    /*
+     * ==========================================
+     * VALOR
+     * ==========================================
+     *
+     * A Pixou trabalha em CENTAVOS.
+     *
+     * Exemplo:
+     * R$ 24,80 = 2480
+     */
 
     const numericAmount = Number(amount);
 
@@ -65,7 +72,8 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "O valor da cobrança precisa ser um número inteiro em centavos.",
+            "O valor enviado deve ser um número inteiro em centavos.",
+          received: amount,
         },
         { status: 400 }
       );
@@ -91,24 +99,32 @@ export async function POST(request: Request) {
       );
     }
 
-    // =====================================================
-    // BUYER
-    // =====================================================
+    /*
+     * ==========================================
+     * PAYLOAD BASE
+     * ==========================================
+     */
 
-    let formattedBuyer:
-      | {
-          name: string;
-          email: string;
-          phone?: string;
-          document?: string;
-        }
-      | undefined;
+    const payload: Record<string, unknown> = {
+      external_id: externalId,
+      payment_method: "pix",
+      amount: numericAmount,
+    };
+
+    /*
+     * ==========================================
+     * BUYER
+     * ==========================================
+     */
 
     if (buyer) {
-      const buyerName = String(buyer.name || "").trim();
-      const buyerEmail = String(buyer.email || "")
-        .trim()
-        .toLowerCase();
+      const buyerName = String(
+        buyer.name || ""
+      ).trim();
+
+      const buyerEmail = String(
+        buyer.email || ""
+      ).trim();
 
       if (
         buyerName.length < 3 ||
@@ -117,7 +133,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              "O nome deve ter entre 3 e 100 caracteres.",
+              "O nome deve possuir entre 3 e 100 caracteres.",
           },
           { status: 400 }
         );
@@ -132,141 +148,96 @@ export async function POST(request: Request) {
         );
       }
 
-      // Validação simples de e-mail
-      if (
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-          buyerEmail
-        )
-      ) {
-        return NextResponse.json(
-          {
-            error: "Digite um e-mail válido.",
-          },
-          { status: 400 }
-        );
-      }
+      /*
+       * WhatsApp
+       *
+       * A Pixou aceita 12 ou 13 dígitos.
+       *
+       * Se o cliente digitar:
+       * (91) 99999-9999
+       *
+       * vira:
+       * 91999999999
+       *
+       * Depois adicionamos 55:
+       * 5591999999999
+       */
 
-      // ---------------------------------------------------
-      // TELEFONE
-      // ---------------------------------------------------
-
-      let formattedPhone: string | undefined;
+      let phone = "";
 
       if (buyer.phone) {
-        let phone = String(buyer.phone).replace(
-          /\D/g,
-          ""
-        );
+        const rawPhone = String(
+          buyer.phone
+        ).replace(/\D/g, "");
 
-        /*
-         * A Pixou exige:
-         * 12 ou 13 dígitos.
-         *
-         * Brasil:
-         * 55 + DDD + número
-         */
-
-        if (phone.startsWith("55")) {
-          // Já está com código do Brasil
-          formattedPhone = phone;
+        if (rawPhone.length === 11) {
+          phone = `55${rawPhone}`;
         } else if (
-          phone.length === 10 ||
-          phone.length === 11
+          rawPhone.length === 12 ||
+          rawPhone.length === 13
         ) {
-          // Adiciona o código do Brasil
-          formattedPhone = `55${phone}`;
+          phone = rawPhone;
         } else {
           return NextResponse.json(
             {
               error:
-                "WhatsApp inválido. Digite o número com DDD, por exemplo: (91) 99999-9999.",
-            },
-            { status: 400 }
-          );
-        }
-
-        if (
-          formattedPhone.length !== 12 &&
-          formattedPhone.length !== 13
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                "WhatsApp inválido. A Pixou exige telefone com 12 ou 13 dígitos.",
+                "O WhatsApp informado é inválido. Informe um número brasileiro com DDD.",
             },
             { status: 400 }
           );
         }
       }
 
-      // ---------------------------------------------------
-      // DOCUMENTO
-      // ---------------------------------------------------
+      const buyerPayload: Record<string, unknown> = {
+        name: buyerName,
+        email: buyerEmail,
+      };
 
-      let formattedDocument: string | undefined;
+      if (phone) {
+        buyerPayload.phone = phone;
+      }
+
+      /*
+       * Documento é opcional.
+       * Só enviamos se realmente existir.
+       */
 
       if (buyer.document) {
-        formattedDocument = String(
+        const document = String(
           buyer.document
         ).replace(/\D/g, "");
 
-        if (
-          formattedDocument.length !== 11 &&
-          formattedDocument.length !== 14
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                "CPF/CNPJ inválido.",
-            },
-            { status: 400 }
-          );
+        if (document.length > 0) {
+          buyerPayload.document = document;
         }
       }
 
-      formattedBuyer = {
-        name: buyerName,
-        email: buyerEmail,
-        ...(formattedPhone
-          ? { phone: formattedPhone }
-          : {}),
-        ...(formattedDocument
-          ? { document: formattedDocument }
-          : {}),
-      };
+      payload.buyer = buyerPayload;
     }
 
-    // =====================================================
-    // PAYLOAD PIXOU
-    // =====================================================
+    /*
+     * ==========================================
+     * PRODUCT
+     * ==========================================
+     */
 
-    const payload: Record<string, unknown> = {
-      external_id: externalId,
+    if (product?.name) {
+      const productName = String(
+        product.name
+      ).trim();
 
-      payment_method: "pix",
-
-      amount: numericAmount,
-    };
-
-    // Buyer
-    if (formattedBuyer) {
-      payload.buyer = formattedBuyer;
+      if (productName) {
+        payload.product = {
+          name: productName,
+        };
+      }
     }
 
-    // Product
-    if (
-      product &&
-      product.name &&
-      String(product.name).trim()
-    ) {
-      payload.product = {
-        name: String(product.name).trim(),
-      };
-    }
-
-    // =====================================================
-    // WEBHOOK
-    // =====================================================
+    /*
+     * ==========================================
+     * WEBHOOK
+     * ==========================================
+     */
 
     if (siteUrl) {
       const cleanSiteUrl = siteUrl.replace(
@@ -278,91 +249,89 @@ export async function POST(request: Request) {
         `${cleanSiteUrl}/api/pixou/webhook`;
     }
 
+    /*
+     * ==========================================
+     * LOG DO PAYLOAD
+     * ==========================================
+     */
+
     console.log(
-      "Enviando cobrança para Pixou:",
-      JSON.stringify(
-        {
-          ...payload,
-          // Não mostra informações sensíveis
-          // do comprador nos logs.
-          buyer: formattedBuyer
-            ? {
-                name: formattedBuyer.name,
-                email: formattedBuyer.email,
-                phone: formattedBuyer.phone
-                  ? "***"
-                  : undefined,
-              }
-            : undefined,
-        },
-        null,
-        2
-      )
+      "PIXOU - PAYLOAD:",
+      JSON.stringify(payload, null, 2)
     );
 
-    // =====================================================
-    // REQUISIÇÃO PIXOU
-    // =====================================================
+    /*
+     * ==========================================
+     * ENVIA PARA PIXOU
+     * ==========================================
+     */
 
     const response = await fetch(
       "https://api.pixoupay.com/charge",
       {
         method: "POST",
-
         headers: {
           Authorization: `Bearer ${secretKey}`,
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
-
         body: JSON.stringify(payload),
-
         cache: "no-store",
       }
     );
 
-    // =====================================================
-    // RESPOSTA
-    // =====================================================
+    /*
+     * ==========================================
+     * LÊ A RESPOSTA
+     * ==========================================
+     */
 
-    const result = await response.json();
+    const responseText = await response.text();
+
+    let result: any = null;
+
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      result = {
+        raw: responseText,
+      };
+    }
+
+    console.log(
+      "PIXOU - STATUS:",
+      response.status
+    );
+
+    console.log(
+      "PIXOU - RESPONSE:",
+      JSON.stringify(result, null, 2)
+    );
+
+    /*
+     * ==========================================
+     * ERRO DA PIXOU
+     * ==========================================
+     */
 
     if (!response.ok) {
-      console.error(
-        "Erro retornado pela Pixou Pay:",
-        JSON.stringify(result, null, 2)
-      );
-
-      const pixouMessage =
-        result?.error?.message;
-
-      const pixouDetail =
-        result?.error?.detail;
-
-      let detailMessage = "";
-
-      if (typeof pixouDetail === "string") {
-        detailMessage = pixouDetail;
-      } else if (pixouDetail) {
-        try {
-          detailMessage = JSON.stringify(
-            pixouDetail
-          );
-        } catch {
-          detailMessage = "";
-        }
-      }
+      const pixouError =
+        result?.error || {};
 
       return NextResponse.json(
         {
           error:
-            pixouMessage ||
-            "Não foi possível criar a cobrança Pix.",
+            pixouError?.message ||
+            "A Pixou recusou a criação da cobrança.",
 
           detail:
-            detailMessage || null,
+            pixouError?.detail ??
+            result?.detail ??
+            null,
 
-          pixou_error:
-            result?.error || null,
+          status: response.status,
+
+          pixou_response: result,
         },
         {
           status: response.status,
@@ -370,60 +339,41 @@ export async function POST(request: Request) {
       );
     }
 
-    // =====================================================
-    // VALIDAÇÃO DA RESPOSTA
-    // =====================================================
+    /*
+     * ==========================================
+     * SUCESSO
+     * ==========================================
+     */
 
     if (!result?.data) {
       return NextResponse.json(
         {
           error:
-            "A Pixou Pay não retornou os dados da cobrança.",
-          detail: result,
+            "A Pixou respondeu sem retornar os dados da cobrança.",
+          pixou_response: result,
         },
         { status: 502 }
       );
     }
 
-    if (!result.data.id) {
+    if (!result.data?.pix?.code) {
       return NextResponse.json(
         {
           error:
-            "A Pixou Pay não retornou o ID da transação.",
+            "A Pixou criou a cobrança, mas não retornou o Pix Copia e Cola.",
+          pixou_response: result,
         },
         { status: 502 }
       );
     }
 
-    if (!result.data.pix) {
-      return NextResponse.json(
-        {
-          error:
-            "A Pixou Pay não retornou os dados do Pix.",
-        },
-        { status: 502 }
-      );
-    }
-
-    if (!result.data.pix.code) {
-      return NextResponse.json(
-        {
-          error:
-            "A Pixou Pay não retornou o código Pix Copia e Cola.",
-        },
-        { status: 502 }
-      );
-    }
-
-    console.log(
-      "Cobrança Pix criada com sucesso:",
-      result.data.id
+    return NextResponse.json(
+      result,
+      { status: 200 }
     );
-
-    return NextResponse.json(result);
   } catch (error) {
     console.error(
-      "Erro interno na integração Pixou Pay:",
+      "PIXOU - ERRO INTERNO:",
       error
     );
 
@@ -431,6 +381,11 @@ export async function POST(request: Request) {
       {
         error:
           "Erro interno ao criar o pagamento Pix.",
+
+        detail:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       { status: 500 }
     );
