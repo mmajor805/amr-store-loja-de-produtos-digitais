@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     const secretKey = process.env.PIXOU_PAY_SECRET_KEY;
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
     if (!secretKey) {
       return NextResponse.json(
@@ -17,144 +16,85 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const {
-      external_id,
-      amount,
-      buyer,
-      product,
-    } = body;
+    const externalId = String(
+      body?.external_id || ""
+    ).trim();
+
+    const amount = Number(body?.amount);
 
     // =========================
-    // VALIDAR ID
+    // VALIDAÇÕES
     // =========================
 
-    if (!external_id) {
+    if (!externalId) {
       return NextResponse.json(
         {
-          error: "external_id é obrigatório.",
+          error: "ID do pedido não informado.",
         },
         { status: 400 }
       );
     }
 
-    // =========================
-    // VALIDAR VALOR
-    // =========================
+    if (!Number.isFinite(amount)) {
+      return NextResponse.json(
+        {
+          error: "Valor do pagamento inválido.",
+          received: body?.amount,
+        },
+        { status: 400 }
+      );
+    }
 
-    const numericAmount = Number(amount);
+    if (!Number.isInteger(amount)) {
+      return NextResponse.json(
+        {
+          error:
+            "O valor deve ser enviado em centavos como número inteiro.",
+          received: amount,
+        },
+        { status: 400 }
+      );
+    }
 
-    if (
-      !Number.isInteger(numericAmount) ||
-      numericAmount < 600
-    ) {
+    if (amount < 600) {
       return NextResponse.json(
         {
           error:
             "O valor mínimo para pagamento via Pix é R$ 6,00.",
-          received_amount: amount,
+          received: amount,
         },
         { status: 400 }
       );
     }
 
-    if (numericAmount > 300000) {
+    if (amount > 300000) {
       return NextResponse.json(
         {
           error:
             "O valor máximo para pagamento via Pix é R$ 3.000,00.",
-          received_amount: amount,
+          received: amount,
         },
         { status: 400 }
       );
     }
 
     // =========================
-    // PREPARAR PAYLOAD
+    // PAYLOAD MÍNIMO
     // =========================
 
-    const payload: Record<string, unknown> = {
-      external_id: String(external_id),
+    const payload = {
+      external_id: externalId,
       payment_method: "pix",
-      amount: numericAmount,
+      amount: amount,
     };
 
-    // =========================
-    // DADOS DO COMPRADOR
-    // =========================
-
-    if (buyer) {
-      const buyerName = String(
-        buyer.name || ""
-      ).trim();
-
-      const buyerEmail = String(
-        buyer.email || ""
-      ).trim();
-
-      const buyerPhone = buyer.phone
-        ? String(buyer.phone).replace(/\D/g, "")
-        : "";
-
-      const buyerDocument = buyer.document
-        ? String(buyer.document).replace(/\D/g, "")
-        : "";
-
-      payload.buyer = {
-        name: buyerName,
-        email: buyerEmail,
-        ...(buyerPhone
-          ? { phone: buyerPhone }
-          : {}),
-        ...(buyerDocument
-          ? { document: buyerDocument }
-          : {}),
-      };
-    }
-
-    // =========================
-    // PRODUTO
-    // =========================
-
-    if (product?.name) {
-      payload.product = {
-        name: String(product.name),
-      };
-    }
-
-    // =========================
-    // WEBHOOK
-    // =========================
-
-    if (siteUrl) {
-      payload.postbackUrl =
-        `${siteUrl.replace(/\/$/, "")}/api/pixou/webhook`;
-    }
-
     console.log(
-      "======================================"
-    );
-
-    console.log(
-      "PIXOU PAY - ENVIANDO COBRANÇA"
-    );
-
-    console.log(
-      JSON.stringify(
-        {
-          ...payload,
-          // Nunca exibe a chave secreta
-        },
-        null,
-        2
-      )
-    );
-
-    console.log(
-      "======================================"
+      "PIXOU - PAYLOAD:",
+      JSON.stringify(payload)
     );
 
     // =========================
-    // CHAMADA PIXOU
+    // REQUISIÇÃO
     // =========================
 
     const response = await fetch(
@@ -175,7 +115,7 @@ export async function POST(request: Request) {
     );
 
     // =========================
-    // LER RESPOSTA
+    // RESPOSTA
     // =========================
 
     const responseText =
@@ -187,38 +127,19 @@ export async function POST(request: Request) {
       result = JSON.parse(responseText);
     } catch {
       result = {
-        raw_response: responseText,
+        raw: responseText,
       };
     }
 
     console.log(
-      "======================================"
-    );
-
-    console.log(
-      "PIXOU PAY - RESPOSTA"
-    );
-
-    console.log(
-      "HTTP STATUS:",
+      "PIXOU - STATUS:",
       response.status
     );
 
     console.log(
-      JSON.stringify(
-        result,
-        null,
-        2
-      )
+      "PIXOU - RESPONSE:",
+      JSON.stringify(result)
     );
-
-    console.log(
-      "======================================"
-    );
-
-    // =========================
-    // ERRO DA PIXOU
-    // =========================
 
     if (!response.ok) {
       return NextResponse.json(
@@ -226,7 +147,7 @@ export async function POST(request: Request) {
           error:
             result?.error?.message ||
             result?.message ||
-            "Não foi possível criar a cobrança Pix.",
+            "A Pixou recusou a cobrança.",
 
           detail:
             result?.error?.detail ||
@@ -234,9 +155,7 @@ export async function POST(request: Request) {
             result?.errors ||
             null,
 
-          pixou_response: result,
-
-          status: response.status,
+          response: result,
         },
         {
           status: response.status,
@@ -252,28 +171,16 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error(
-      "======================================"
-    );
-
-    console.error(
-      "ERRO INTERNO PIXOU PAY:"
-    );
-
-    console.error(error);
-
-    console.error(
-      "======================================"
+      "PIXOU - ERRO INTERNO:",
+      error
     );
 
     return NextResponse.json(
       {
         error:
-          "Erro interno ao criar o pagamento Pix.",
-
-        detail:
           error instanceof Error
             ? error.message
-            : String(error),
+            : "Erro interno ao criar pagamento.",
       },
       {
         status: 500,
